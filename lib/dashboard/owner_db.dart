@@ -146,6 +146,7 @@ class _TruckOwnerDashboardState extends State<TruckOwnerDashboard> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
 
       appBar: _buildAppBar(),
+      bottomNavigationBar: _buildBottomAppBar(),
       body: _dashboardState.isLoading
           ? const Center(child: CircularProgressIndicator())
           : _dashboardState.error != null
@@ -461,6 +462,57 @@ class _TruckOwnerDashboardState extends State<TruckOwnerDashboard> {
           ],
         );
       },
+    );
+  }
+  Widget _buildBottomAppBar() {
+    return BottomAppBar(
+      elevation: 0, // ✅ remove appbar shadow, match screenshot
+      color: Colors.transparent, // ✅ transparent background
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+
+        child: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const BlankPage(), // ✅ blank page navigation
+              ),
+            );
+          },
+
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.orange, // ✅ your orange button
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.analytics_outlined, color: Colors.white),
+
+                const SizedBox(width: 8),
+
+                Flexible(
+                  child: Text(
+                    'viewreport&analysis'.tr(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
