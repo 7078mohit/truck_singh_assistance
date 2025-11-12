@@ -20,7 +20,6 @@ class AppVersionPage extends StatelessWidget {
         : isTablet
         ? 15
         : 14.5;
-
     const double maxContentWidth = 600;
 
     return Scaffold(
@@ -32,48 +31,50 @@ class AppVersionPage extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: maxContentWidth),
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isDesktop
-                    ? 48
-                    : isTablet
-                    ? 32
-                    : 16,
-                vertical: isDesktop
-                    ? 40
-                    : isTablet
-                    ? 28
-                    : 20,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 24),
-                  _buildCard(
-                    title: "about_the_app".tr(),
-                    description:
-                    "about_the_app_description".tr(),
-                    fontSize: bodyFontSize,
-                    context: context,
-                  ),
-                  _buildCard(
-                    title: "core_features".tr(),
-                    description:
-                    "core_features_description".tr(),
-                    fontSize: bodyFontSize,
-                    context: context,
-                  ),
-                  _buildCard(
-                    title: "updates".tr(),
-                    description: "updates_description".tr(),
-                    fontSize: bodyFontSize,
-                    context: context,
-                  ),
-                ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: maxContentWidth),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop
+                      ? 48
+                      : isTablet
+                      ? 32
+                      : 16,
+                  vertical: isDesktop
+                      ? 40
+                      : isTablet
+                      ? 28
+                      : 20,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 24),
+                    _buildCard(
+                      title: "about_the_app".tr(),
+                      description:
+                      "about_the_app_description".tr(),
+                      fontSize: bodyFontSize,
+                      context: context,
+                    ),
+                    _buildCard(
+                      title: "core_features".tr(),
+                      description:
+                      "core_features_description".tr(),
+                      fontSize: bodyFontSize,
+                      context: context,
+                    ),
+                    _buildCard(
+                      title: "updates".tr(),
+                      description: "updates_description".tr(),
+                      fontSize: bodyFontSize,
+                      context: context,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -81,7 +82,6 @@ class AppVersionPage extends StatelessWidget {
       ),
     );
   }
-
   Widget _buildCard({
     required String title,
     required String description,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart' as ptr;
 
 class NotificationCenterPage extends StatefulWidget {
   const NotificationCenterPage({Key? key}) : super(key: key);
@@ -14,6 +15,9 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
   bool showReadNotifications = false;
   bool isLoading = false;
   List<Map<String, dynamic>> notifications = [];
+  final ptr.RefreshController _refreshController = ptr.RefreshController(
+    initialRefresh: false,
+  );
 
   @override
   void initState() {
@@ -24,16 +28,24 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
   Future<void> _loadNotifications() async {
     setState(() => isLoading = true);
 
-    final response = await supabase
-        .from('notifications')
-        .select()
-        .order('created_at', ascending: false);
+    try {
+      final response = await supabase
+          .from('notifications')
+          .select()
+          .order('created_at', ascending: false);
 
-    if (mounted) {
-      setState(() {
-        notifications = List<Map<String, dynamic>>.from(response);
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          notifications = List<Map<String, dynamic>>.from(response);
+          isLoading = false;
+        });
+        _refreshController.refreshCompleted();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+      _refreshController.refreshFailed();
     }
   }
 
@@ -44,7 +56,10 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
   }
 
   Future<void> markAllAsRead() async {
-    await supabase.from('notifications').update({'is_read': true}).neq('is_read', true);
+    await supabase
+        .from('notifications')
+        .update({'is_read': true})
+        .neq('is_read', true);
     await _loadNotifications();
   }
 
@@ -80,7 +95,9 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
         title: Text('notifications'.tr()),
         actions: [
           IconButton(
-            icon: Icon(showReadNotifications ? Icons.visibility_off : Icons.visibility),
+            icon: Icon(
+              showReadNotifications ? Icons.visibility_off : Icons.visibility,
+            ),
             tooltip: showReadNotifications ? 'hide_read'.tr() : 'show_all'.tr(),
             onPressed: toggleShowReadNotifications,
           ),
@@ -89,81 +106,89 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
             tooltip: 'mark_all_as_read'.tr(),
             onPressed: markAllAsRead,
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'refresh'.tr(),
-            onPressed: _loadNotifications,
-          ),
         ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : filteredNotifications.isEmpty
-          ? Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.notifications_off, size: 70, color: Colors.grey),
-            const SizedBox(height: 10),
-            Text(
-              showReadNotifications
-                  ? 'no_notifications_found'.tr()
-                  : 'all_caught_up'.tr(),
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineMedium
-                  ?.copyWith(color: Colors.grey),
-            ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: toggleShowReadNotifications,
-              child: Text('show_read_notifications'.tr()),
-            ),
-          ],
-        ),
-      )
-          : ListView.builder(
-        itemCount: filteredNotifications.length,
-        itemBuilder: (context, index) {
-          final notification = filteredNotifications[index];
-          final isRead = notification['is_read'] ?? false;
-          final timestamp = DateTime.parse(notification['created_at']);
-          final timeAgo = _formatTimeAgo(timestamp);
+      body: ptr.SmartRefresher(
+        controller: _refreshController,
+        onRefresh: _loadNotifications,
+        enablePullDown: true,
+        enablePullUp: false,
+        header: const ptr.WaterDropHeader(),
+        child: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : filteredNotifications.isEmpty
+            ? Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.notifications_off,
+                size: 70,
+                color: Colors.grey,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                showReadNotifications
+                    ? 'no_notifications_found'.tr()
+                    : 'all_caught_up'.tr(),
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineMedium?.copyWith(color: Colors.grey),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: toggleShowReadNotifications,
+                child: Text('show_read_notifications'.tr()),
+              ),
+            ],
+          ),
+        )
+            : ListView.builder(
+          itemCount: filteredNotifications.length,
+          itemBuilder: (context, index) {
+            final notification = filteredNotifications[index];
+            final isRead = notification['is_read'] ?? false;
+            final timestamp = DateTime.parse(notification['created_at']);
+            final timeAgo = _formatTimeAgo(timestamp);
 
-          return Card(
-            color: isRead
-                ? Theme.of(context).colorScheme.surface
-                : Theme.of(context).colorScheme.primaryContainer,
-            child: ListTile(
-              leading: const Icon(Icons.notifications),
-              title: Text(notification['title'] ?? ''),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(notification['message'] ?? ''),
-                  const SizedBox(height: 4),
-                  Text(
-                    timeAgo,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
+            return Card(
+              color: isRead
+                  ? Theme.of(context).colorScheme.surface
+                  : Theme.of(context).colorScheme.primaryContainer,
+              child: ListTile(
+                leading: const Icon(Icons.notifications),
+                title: Text(notification['title'] ?? ''),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(notification['message'] ?? ''),
+                    const SizedBox(height: 4),
+                    Text(
+                      timeAgo,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+                trailing: isRead
+                    ? null
+                    : IconButton(
+                  icon: const Icon(Icons.mark_email_read),
+                  onPressed: () async {
+                    await supabase
+                        .from('notifications')
+                        .update({'is_read': true})
+                        .eq('id', notification['id']);
+                    _loadNotifications();
+                  },
+                ),
+                onTap: () => _showNotificationDetails(notification),
               ),
-              trailing: isRead
-                  ? null
-                  : IconButton(
-                icon: const Icon(Icons.mark_email_read),
-                onPressed: () async {
-                  await supabase
-                      .from('notifications')
-                      .update({'is_read': true})
-                      .eq('id', notification['id']);
-                  _loadNotifications();
-                },
-              ),
-              onTap: () => _showNotificationDetails(notification),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

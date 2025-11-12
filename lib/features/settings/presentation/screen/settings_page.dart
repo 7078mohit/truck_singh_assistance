@@ -1197,13 +1197,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
       // Gmail deep link
       final Uri gmailUri = Uri.parse(
-        "googlegmail://co?to=rishu200422@gmail.com&subject=Bug%20Report&body=${Uri.encodeComponent(bugText)}",
+        "googlegmail://co?to=trucksingh.com@gmail.com&subject=Bug%20Report&body=${Uri.encodeComponent(bugText)}",
       );
 
       // Fallback mailto link
       final Uri mailtoUri = Uri(
         scheme: 'mailto',
-        path: 'rishu200422@gmail.com',
+        path: 'trucksingh.com@gmail.com',
         queryParameters: {'subject': 'Bug Report', 'body': bugText},
       );
 

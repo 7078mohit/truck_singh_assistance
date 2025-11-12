@@ -1,3 +1,4 @@
+// lib/features/settings/presentation/screen/notificationDetails_page.dart
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 
@@ -35,49 +36,48 @@ class NotificationDetailsPage extends StatelessWidget {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: maxContentWidth),
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isDesktop
-                    ? 48
-                    : isTablet
-                    ? 32
-                    : 16,
-                vertical: isDesktop
-                    ? 40
-                    : isTablet
-                    ? 28
-                    : 20,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 24),
-
-                  _buildCard(
-                    title: 'shipmentNotificationsTitle'.tr(),
-                    description: 'shipmentNotificationsDescription'.tr(),
-                    context: context,
-                    fontSize: bodyFontSize,
-                  ),
-
-                  _buildCard(
-                    title: 'driverSOSAlertsTitle'.tr(),
-                    description: 'driverSOSAlertsDescription'.tr(),
-                    context: context,
-                    fontSize: bodyFontSize,
-                  ),
-
-                  _buildCard(
-                    title: 'adminAccountTitle'.tr(),
-                    description: 'adminAccountDescription'.tr(),
-                    context: context,
-                    fontSize: bodyFontSize,
-                  ),
-                ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: maxContentWidth),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop
+                      ? 48
+                      : isTablet
+                      ? 32
+                      : 16,
+                  vertical: isDesktop
+                      ? 40
+                      : isTablet
+                      ? 28
+                      : 20,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 24),
+                    _buildCard(
+                      title: 'shipmentNotificationsTitle'.tr(),
+                      description: 'shipmentNotificationsDescription'.tr(),
+                      context: context,
+                      fontSize: bodyFontSize,
+                    ),
+                    _buildCard(
+                      title: 'driverSOSAlertsTitle'.tr(),
+                      description: 'driverSOSAlertsDescription'.tr(),
+                      context: context,
+                      fontSize: bodyFontSize,
+                    ),
+                    _buildCard(
+                      title: 'adminAccountTitle'.tr(),
+                      description: 'adminAccountDescription'.tr(),
+                      context: context,
+                      fontSize: bodyFontSize,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -85,7 +85,6 @@ class NotificationDetailsPage extends StatelessWidget {
       ),
     );
   }
-
   Widget _buildCard({
     required String title,
     required String description,

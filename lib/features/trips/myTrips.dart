@@ -102,31 +102,20 @@ class _MyShipmentsPageState extends State<MyShipments> {
       }
       return false;
     }).toList();
-
-    // Cache the shipments
     await _prefs?.setString('shipments_cache', jsonEncode(shipments));
-
-    // Fetch rating edit counts
     await fetchEditCounts();
 
     setState(() {
       loading = false;
       _refresh_controllerRefreshCompleted();
-      // note: calling controller's refreshCompleted() is present in original - keep semantics below
     });
-
-    // original call: _refreshController.refreshCompleted();
-    // but to avoid lint issue we call it directly:
     try {
       _refreshController.refreshCompleted();
     } catch (_) {}
 
     applyFilters();
   }
-
-  // Helper to match original method name style (keeps UI/logic same)
   void _refresh_controllerRefreshCompleted() {
-    // placeholder used above; actual call done via try/catch afterwards
   }
 
   void searchShipments(String query) {
@@ -181,35 +170,38 @@ class _MyShipmentsPageState extends State<MyShipments> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        contentPadding: EdgeInsets.symmetric(vertical: 8 , horizontal: 16),
         title: Text('filterByStatus'.tr()),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            'All',
-            'Pending',
-            'Accepted',
-            'En Route to Pickup',
-            'Arrived at Pickup',
-            'Loading',
-            'Picked Up',
-            'In Transit',
-            'Arrived at Drop',
-            'Unloading',
-            'Delivered',
-            'Completed',
-          ].map((status) {
-            return RadioListTile<String>(
-              value: status,
-              groupValue: statusFilter,
-              title: Text(status.tr()),
-              onChanged: (val) {
-                if (val != null) {
-                  Navigator.pop(context);
-                  filterByStatus(val);
-                }
-              },
-            );
-          }).toList(),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              'All',
+              'Pending',
+              'Accepted',
+              'En Route to Pickup',
+              'Arrived at Pickup',
+              'Loading',
+              'Picked Up',
+              'In Transit',
+              'Arrived at Drop',
+              'Unloading',
+              'Delivered',
+              'Completed',
+            ].map((status) {
+              return RadioListTile<String>(
+                value: status,
+                groupValue: statusFilter,
+                title: Text(status.tr()),
+                onChanged: (val) {
+                  if (val != null) {
+                    Navigator.pop(context);
+                    filterByStatus(val);
+                  }
+                },
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
@@ -273,7 +265,6 @@ class _MyShipmentsPageState extends State<MyShipments> {
     }
   }
 
-  // Newly Added function to display urgent or delayed badges based on delivery date
   Widget? getShipmentBadge(Map<String, dynamic> shipment) {
     final deliveryDate = DateTime.tryParse(shipment['delivery_date'] ?? '');
     if (deliveryDate == null) return null;
@@ -370,7 +361,6 @@ class _MyShipmentsPageState extends State<MyShipments> {
     );
   }
 
-  // Newly: Added function to format dates in(Today , Yesterday and so on as asked)
   String getFormattedDate(String? dateStr) {
     final date = DateTime.tryParse(dateStr ?? '') ?? DateTime.now();
     final now = DateTime.now();
@@ -391,9 +381,7 @@ class _MyShipmentsPageState extends State<MyShipments> {
     return formattedDate;
   }
 
-  // function to full trim address
   String trimAddress(String address) {
-    // Remove common redundant words
     String cleaned = address
         .replaceAll(
       RegExp(
@@ -402,26 +390,23 @@ class _MyShipmentsPageState extends State<MyShipments> {
       ),
       '',
     )
-        .replaceAll(RegExp(r'\s+'), ' ') // normalize spaces
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 
     List<String> parts = cleaned.split(',');
     parts = parts.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
 
     if (parts.length >= 3) {
-      String first = parts[0]; // village/area
+      String first = parts[0];
       String city = parts[parts.length - 2];
-      //String state = parts[parts.length - 1];
       return "$first,$city";
     } else if (parts.length == 2) {
       return "${parts[0]}, ${parts[1]}";
     } else {
-      // fallback: just shorten
       return cleaned.length > 50 ? "${cleaned.substring(0, 50)}..." : cleaned;
     }
   }
 
-  // Newly Added a skeleton loader
   Widget buildSkeletonLoader() {
     return ListView.builder(
       itemCount: 5,
@@ -458,7 +443,6 @@ class _MyShipmentsPageState extends State<MyShipments> {
     );
   }
 
-  // Newly Added empty state UI for when no shipments are created or is found
   Widget buildEmptyState() {
     return Center(
       child: Column(
@@ -476,7 +460,6 @@ class _MyShipmentsPageState extends State<MyShipments> {
           const SizedBox(height: 8),
           Text(
             'tryRefreshing'.tr(),
-            //style: TextStyle(color: Colors.grey[500]),
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
@@ -509,9 +492,12 @@ class _MyShipmentsPageState extends State<MyShipments> {
             icon: const Icon(Icons.filter_list),
             onPressed: showFilterDialog,
           ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: fetchShipments,
+          ),
         ],
       ),
-      // Newly added Wrapped body in RefreshIndicator
       body: RefreshIndicator(
         onRefresh: fetchShipments,
         child: loading
@@ -524,9 +510,7 @@ class _MyShipmentsPageState extends State<MyShipments> {
               : filteredShipments.length,
           itemBuilder: (_, i) {
             final s = filteredShipments[i];
-            // Newly Moved date formatting to getFormattedDate
             return InkWell(
-              // In myTrips.dart, inside the onTap for a list item
               onTap: () async {
                 final newEditCount = await Navigator.push(
                   context,
@@ -537,10 +521,7 @@ class _MyShipmentsPageState extends State<MyShipments> {
                     ),
                   ),
                 );
-
-                // Check if a valid edit count was returned
                 if (newEditCount != null && newEditCount is int) {
-                  // Find the item in the list and update its edit count
                   final index = filteredShipments.indexWhere(
                         (shipment) =>
                     shipment['shipment_id'] == s['shipment_id'],
@@ -567,7 +548,7 @@ class _MyShipmentsPageState extends State<MyShipments> {
                   padding: const EdgeInsets.all(12.0),
                   child: Row(
                     crossAxisAlignment:
-                    CrossAxisAlignment.start, // Align top of the card
+                    CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Column(
@@ -583,7 +564,7 @@ class _MyShipmentsPageState extends State<MyShipments> {
                                 const SizedBox(width: 4),
                                 Flexible(
                                   child: Text(
-                                    '${trimAddress(s['pickup'] ?? '')}', // pickup trimmed address as company name and city name
+                                    '${trimAddress(s['pickup'] ?? '')}',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -602,7 +583,7 @@ class _MyShipmentsPageState extends State<MyShipments> {
                                 const SizedBox(width: 4),
                                 Flexible(
                                   child: Text(
-                                    '${trimAddress(s['drop'] ?? '')}', // drop trimmed address as company name and city name
+                                    '${trimAddress(s['drop'] ?? '')}',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -646,9 +627,7 @@ class _MyShipmentsPageState extends State<MyShipments> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // "TRACK" button column on the right side
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                      Column(                          crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           if (getShipmentBadge(s) != null) getShipmentBadge(s)!,
                           const SizedBox(height: 50),

@@ -4,7 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'package:uuid/uuid.dart';
 
+
+//address models
 class BillingAddress {
   String flatNo, streetName, cityName, district, zipCode;
   BillingAddress({
@@ -443,8 +446,6 @@ class _AddressBookPageState extends State<AddressBookPage> {
                     label,
                     style: const TextStyle(
                       fontSize: 16,
-                      //fontWeight: FontWeight.w600,
-                      //color: Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -508,112 +509,110 @@ class _AddressBookPageState extends State<AddressBookPage> {
         title: Text('address Book'.tr()),
         centerTitle: true,
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: IntrinsicHeight(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-
-                    // Billing Address Section
-                    Text(
-                      "billing Address".tr(),
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                    ),
-                    const SizedBox(height: 8),
-
-                    _loadingBilling
-                        ? const Center(child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: CircularProgressIndicator()))
-                        : _billingAddress != null
-                        ? _buildAddressCard(
-                      label: "home".tr(),
-                      addressPreview:
-                      '${_billingAddress!.flatNo}, ${_billingAddress!.streetName}, ${_billingAddress!.cityName}, ${_billingAddress!.district} - ${_billingAddress!.zipCode}',
-                      icon: Icons.home,
-                      onEdit: () => _showBillingDialog(),
-                      onDelete: () => _deleteBillingAddress(),
-                    )
-                        : Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      child: ListTile(
-                        leading: const Icon(Icons.home),
-                        title: Text("no Billing Address Set".tr()),
-                        trailing: TextButton(
-                          onPressed: () => _showBillingDialog(),
-                          child: Text("add".tr()),
-                        ),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "billing Address".tr(),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                       ),
-                    ),
+                      const SizedBox(height: 8),
 
-                    const SizedBox(height: 32),
-
-                    // Company Address Section Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "company Addresses".tr(),
-                          style:
-                          TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: canAddMore
-                              ? () {
-                            int nextSlot = [1, 2, 3][filledCount];
-                            _showCompanyDialog(nextSlot);
-                          }
-                              : null,
-                          icon: const Icon(Icons.add),
-                          label:  Text("add Address".tr()),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
+                      _loadingBilling
+                          ? const Center(child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: CircularProgressIndicator()))
+                          : _billingAddress != null
+                          ? _buildAddressCard(
+                        label: "home".tr(),
+                        addressPreview:
+                        '${_billingAddress!.flatNo}, ${_billingAddress!.streetName}, ${_billingAddress!.cityName}, ${_billingAddress!.district} - ${_billingAddress!.zipCode}',
+                        icon: Icons.home,
+                        onEdit: () => _showBillingDialog(),
+                        onDelete: () => _deleteBillingAddress(),
+                      )
+                          : Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        child: ListTile(
+                          leading: const Icon(Icons.home),
+                          title: Text("no Billing Address Set".tr()),
+                          trailing: TextButton(
+                            onPressed: () => _showBillingDialog(),
+                            child: Text("add".tr()),
                           ),
                         ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    _loadingCompany
-                        ? const Center(child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: CircularProgressIndicator()))
-                        : companyWidgets.isEmpty
-                        ? Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(
-                        "no Company Addresses Added".tr(),
-                        style: TextStyle(
-                          fontStyle: FontStyle.italic,
-                          color: Colors.grey[600],
-                        ),
                       ),
-                    )
-                        : Column(
-                      children: companyWidgets
-                          .map((widget) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: widget,
-                      ))
-                          .toList(),
-                    ),
 
-                    const SizedBox(height: 24),
-                  ],
+                      const SizedBox(height: 32),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "company Addresses".tr(),
+                            style:
+                            TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: canAddMore
+                                ? () {
+                              int nextSlot = [1, 2, 3][filledCount];
+                              _showCompanyDialog(nextSlot);
+                            }
+                                : null,
+                            icon: const Icon(Icons.add),
+                            label:  Text("add Address".tr()),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      _loadingCompany
+                          ? const Center(child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: CircularProgressIndicator()))
+                          : companyWidgets.isEmpty
+                          ? Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          "no Company Addresses Added".tr(),
+                          style: TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      )
+                          : Column(
+                        children: companyWidgets
+                            .map((widget) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: widget,
+                        ))
+                            .toList(),
+                      ),
+
+                      const SizedBox(height: 24),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

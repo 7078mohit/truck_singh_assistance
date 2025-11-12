@@ -73,11 +73,13 @@ class _UserSupportTicketsPageState extends State<UserSupportTicketsPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildFilterChips(),
-          Expanded(child: _buildTicketsList()),
-        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildFilterChips(),
+            Expanded(child: _buildTicketsList()),
+          ],
+        ),
       ),
     );
   }
