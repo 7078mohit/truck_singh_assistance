@@ -238,265 +238,267 @@ class _SupportTicketSubmissionPageState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title:  Text('Request Support'.tr()), elevation: 0),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Describe your issue'.tr(),
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Our support team will help you resolve any problems you\'re experiencing with the app.'.tr(),
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 24),
-
-              // Subject Field
-              TextFormField(
-                controller: _subjectController,
-                decoration:  InputDecoration(
-                  labelText: 'Subject *'.tr(),
-                  hintText: 'Brief summary of your issue'.tr(),
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.title),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Describe your issue'.tr(),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a subject'.tr();
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                decoration: InputDecoration(
-                  labelText: 'Category'.tr(),
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.category),
+                const SizedBox(height: 8),
+                Text(
+                  'Our support team will help you resolve any problems you\'re experiencing with the app.'.tr(),
+                  style: TextStyle(color: Colors.grey),
                 ),
-                items: _categoryKeys.map((key) {
-                  return DropdownMenuItem(
-                    value: key,
-                    child: Text(_categoryLabels[key]!.tr()),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategory = value!;
-                  });
-                },
-              ),
+                const SizedBox(height: 24),
 
-              const SizedBox(height: 16),
-
-
-              DropdownButtonFormField<String>(
-                value: _selectedPriority,
-                decoration: InputDecoration(
-                  labelText: 'Priority'.tr(),
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.priority_high),
+                // Subject Field
+                TextFormField(
+                  controller: _subjectController,
+                  decoration:  InputDecoration(
+                    labelText: 'Subject *'.tr(),
+                    hintText: 'Brief summary of your issue'.tr(),
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.title),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter a subject'.tr();
+                    }
+                    return null;
+                  },
                 ),
-                items: _priorityKeys.map((key) {
-                  return DropdownMenuItem(
-                    value: key,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: _getPriorityColor(key), // If your method expects label change to use key
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(_priorityLabels[key]!.tr()), // Localized label
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedPriority = value!;
-                  });
-                },
-              ),
+                const SizedBox(height: 16),
 
-              const SizedBox(height: 16),
-
-              // Message Field
-              TextFormField(
-                controller: _messageController,
-                maxLines: 6,
-                decoration:  InputDecoration(
-                  labelText: 'Describe your issue *'.tr(),
-                  hintText:
-                  'Please provide as much detail as possible about the problem you\'re experiencing...'.tr(),
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
+                DropdownButtonFormField<String>(
+                  value: _selectedCategory,
+                  decoration: InputDecoration(
+                    labelText: 'Category'.tr(),
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.category),
+                  ),
+                  items: _categoryKeys.map((key) {
+                    return DropdownMenuItem(
+                      value: key,
+                      child: Text(_categoryLabels[key]!.tr()),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCategory = value!;
+                    });
+                  },
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please describe your issue'.tr();
-                  }
-                  if (value.trim().length < 10) {
-                    return 'Please provide more details (at least 10 characters)'.tr();
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
 
-              // Screenshot Section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  //color: Colors.white,
-                  border: Border.all(color: Colors.orange, width: 2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.camera_alt, color: Colors.blue),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Screenshot (Optional)'.tr(),
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Adding a screenshot helps us understand your issue better'.tr(),
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-                    if (_selectedImage != null) ...[
-                      Container(
-                        height: 200,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          //color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
-                              spreadRadius: 1,
-                              blurRadius: 3,
-                              offset: const Offset(0, 1),
+
+                DropdownButtonFormField<String>(
+                  value: _selectedPriority,
+                  decoration: InputDecoration(
+                    labelText: 'Priority'.tr(),
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.priority_high),
+                  ),
+                  items: _priorityKeys.map((key) {
+                    return DropdownMenuItem(
+                      value: key,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: _getPriorityColor(key), // If your method expects label change to use key
+                              shape: BoxShape.circle,
                             ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: Image.file(_selectedImage!, fit: BoxFit.cover),
-                        ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(_priorityLabels[key]!.tr()), // Localized label
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                    ],
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedPriority = value!;
+                    });
+                  },
+                ),
 
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        //color: Colors.white,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: Colors.grey.shade400),
+                const SizedBox(height: 16),
+
+                // Message Field
+                TextFormField(
+                  controller: _messageController,
+                  maxLines: 6,
+                  decoration:  InputDecoration(
+                    labelText: 'Describe your issue *'.tr(),
+                    hintText:
+                    'Please provide as much detail as possible about the problem you\'re experiencing...'.tr(),
+                    border: OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please describe your issue'.tr();
+                    }
+                    if (value.trim().length < 10) {
+                      return 'Please provide more details (at least 10 characters)'.tr();
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Screenshot Section
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    //color: Colors.white,
+                    border: Border.all(color: Colors.orange, width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.camera_alt, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Screenshot (Optional)'.tr(),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
-                      child: InkWell(
-                        onTap: _showImagePicker,
-                        borderRadius: BorderRadius.circular(4),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _selectedImage != null
-                                    ? Icons.edit
-                                    : Icons.add_a_photo,
-                                color: Colors.grey.shade600,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                _selectedImage != null
-                                    ? 'Change Image'.tr()
-                                    : 'Add Screenshot'.tr(),
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade700,
-                                ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Adding a screenshot helps us understand your issue better'.tr(),
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+
+                      if (_selectedImage != null) ...[
+                        Container(
+                          height: 200,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            //color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                spreadRadius: 1,
+                                blurRadius: 3,
+                                offset: const Offset(0, 1),
                               ),
                             ],
                           ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          //color: Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.grey.shade400),
+                        ),
+                        child: InkWell(
+                          onTap: _showImagePicker,
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _selectedImage != null
+                                      ? Icons.edit
+                                      : Icons.add_a_photo,
+                                  color: Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  _selectedImage != null
+                                      ? 'Change Image'.tr()
+                                      : 'Add Screenshot'.tr(),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Submit Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSubmitting ? null : _submitTicket,
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                        : const Icon(Icons.send),
+                    label: Text(
+                      _isSubmitting ? 'Submitting...'.tr() : 'Submit Support Request'.tr(),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: _isSubmitting ? null : _submitTicket,
-                  icon: _isSubmitting
-                      ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                      : const Icon(Icons.send),
-                  label: Text(
-                    _isSubmitting ? 'Submitting...'.tr() : 'Submit Support Request'.tr(),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Help Text
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child:  Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'We typically respond to support requests within 24 hours during business days.'.tr(),
-                        style: TextStyle(color: Colors.blue),
+                // Help Text
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child:  Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'We typically respond to support requests within 24 hours during business days.'.tr(),
+                          style: TextStyle(color: Colors.blue),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

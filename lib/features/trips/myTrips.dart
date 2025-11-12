@@ -509,10 +509,6 @@ class _MyShipmentsPageState extends State<MyShipments> {
             icon: const Icon(Icons.filter_list),
             onPressed: showFilterDialog,
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: fetchShipments,
-          ),
         ],
       ),
       // Newly added Wrapped body in RefreshIndicator

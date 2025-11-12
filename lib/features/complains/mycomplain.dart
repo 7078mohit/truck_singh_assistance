@@ -3,6 +3,8 @@ import 'complain_detail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart' as ptr;
+
 
 class ComplaintHistoryPage extends StatefulWidget {
   final String? initialComplaintId;
@@ -25,6 +27,8 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
   String _typeFilter = 'All';
   DateTimeRange? _dateRange;
   String _searchQuery = '';
+  final ptr.RefreshController _refreshController =
+  ptr.RefreshController(initialRefresh: false);
 
   @override
   void initState() {
@@ -102,6 +106,8 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
         error = e.toString();
         loading = false;
       });
+    } finally {
+      _refreshController.refreshCompleted();
     }
   }
 
@@ -466,15 +472,8 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
         title:  Text('complaint_history'.tr()),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: fetchCurrentUserRoleAndComplaints,
-          ),
-        ],
         bottom: TabBar(
           controller: _tabController,
-          // properties to make white when clicked
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white.withOpacity(0.7),
@@ -504,17 +503,24 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
         children: [
           _buildFilters(),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildComplaintList(complaintsMade),
-                _buildComplaintList(complaintsAgainst),
-                if (_isAdminOnly(_currentUserRole))
-                  _buildComplaintList(allComplaints,
-                      showParties: true),
-              ],
+            child: ptr.SmartRefresher(
+              controller: _refreshController,
+              onRefresh: fetchCurrentUserRoleAndComplaints,
+              enablePullDown: true,
+              enablePullUp: false,
+              header: const ptr.WaterDropHeader(),
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildComplaintList(complaintsMade),
+                  _buildComplaintList(complaintsAgainst),
+                  if (_isAdminOnly(_currentUserRole))
+                    _buildComplaintList(allComplaints, showParties: true),
+                ],
+              ),
             ),
           ),
+
         ],
       ),
     );

@@ -161,28 +161,12 @@ class _TripRatingsPageState extends State<TripRatingsPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Rating
                   Row(
                     children: [
-                      // const Icon(Icons.star, color: Colors.amber, size: 22),
-                      // const SizedBox(width: 4),
-                      // Text(
-                      //   (trip['rating'] ?? 0).toString(),
-                      //   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      // ),
                       const SizedBox(width: 8),
-                      // RatingBarIndicator(
-                      //   rating: (trip['rating'] ?? 0).toDouble(),
-                      //   itemBuilder: (context, _) =>
-                      //       const Icon(Icons.star, color: Colors.amber),
-                      //   itemCount: 5,
-                      //   itemSize: 20,
-                      // ),
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // Trip Info Cards
                   _popupInfoCard(
                     Icons.numbers,
                     tr("trip_id"),
@@ -384,122 +368,124 @@ class _TripRatingsPageState extends State<TripRatingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(tr("my_performance"))),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-          ? Center(
-        child: Text(
-          _errorMessage!,
-          style: const TextStyle(color: Colors.red),
-        ),
-      )
-          : ptr.SmartRefresher(
-        controller: _refreshController,
-        onRefresh: _fetchRatings,
-        header: const ptr.WaterDropHeader(),
-        child: ListView.builder(
-          itemCount: _ratings.length + 1,
-          itemBuilder: (context, index) {
-            if (index == 0) return _buildSummaryCard();
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null
+            ? Center(
+          child: Text(
+            _errorMessage!,
+            style: const TextStyle(color: Colors.red),
+          ),
+        )
+            : ptr.SmartRefresher(
+          controller: _refreshController,
+          onRefresh: _fetchRatings,
+          header: const ptr.WaterDropHeader(),
+          child: ListView.builder(
+            itemCount: _ratings.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) return _buildSummaryCard();
 
-            final trip = _ratings[index - 1];
+              final trip = _ratings[index - 1];
 
-            return InkWell(
-              onTap: () => _showTripDetailsPopup(context, trip),
-              child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                margin: const EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 16,
-                ),
-                elevation: 3,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Top Row : ID
-                      Text(
-                        trip['shipment_id'] ?? 'Unknown',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-
-                      // Completed Date
-                      if (trip['delivery_date'] != null &&
-                          trip['delivery_date'] != '')
+              return InkWell(
+                onTap: () => _showTripDetailsPopup(context, trip),
+                child: Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  margin: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 16,
+                  ),
+                  elevation: 3,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Top Row : ID
                         Text(
-                          "completed : ${trip['delivery_date']}".tr(),
+                          trip['shipment_id'] ?? 'Unknown',
                           style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
-                      const SizedBox(height: 8),
+                        const SizedBox(height: 6),
 
-                      // Pickup Address
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.location_on,
-                            color: Colors.blue,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'PICKUP: ${trimAddress(trip['pickup'] ?? '')}',
-                              style: const TextStyle(fontSize: 14),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
+                        // Completed Date
+                        if (trip['delivery_date'] != null &&
+                            trip['delivery_date'] != '')
+                          Text(
+                            "completed : ${trip['delivery_date']}".tr(),
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
+                        const SizedBox(height: 8),
 
-                      // Drop Address
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.flag,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'DROP: ${trimAddress(trip['drop'] ?? '')}',
-                              style: const TextStyle(fontSize: 14),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
+                        // Pickup Address
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.location_on,
+                              color: Colors.blue,
+                              size: 20,
                             ),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'PICKUP: ${trimAddress(trip['pickup'] ?? '')}',
+                                style: const TextStyle(fontSize: 14),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
 
-                      const SizedBox(height: 10),
-                      // Rating Bar
-                      RatingBarIndicator(
-                        rating: (trip['rating'] ?? 0).toDouble(),
-                        itemBuilder: (context, _) =>
-                        const Icon(Icons.star, color: Colors.amber),
-                        itemCount: 5,
-                        itemSize: 20.0,
-                      ),
-                    ],
+                        // Drop Address
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.flag,
+                              color: Colors.red,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'DROP: ${trimAddress(trip['drop'] ?? '')}',
+                                style: const TextStyle(fontSize: 14),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 10),
+                        // Rating Bar
+                        RatingBarIndicator(
+                          rating: (trip['rating'] ?? 0).toDouble(),
+                          itemBuilder: (context, _) =>
+                          const Icon(Icons.star, color: Colors.amber),
+                          itemCount: 5,
+                          itemSize: 20.0,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );

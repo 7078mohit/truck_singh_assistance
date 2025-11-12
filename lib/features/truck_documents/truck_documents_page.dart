@@ -5,6 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:logistics_toolkit/config/theme.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart' as ptr;
+
 
 enum UserRole { agent, truckOwner, driver }
 
@@ -28,6 +30,8 @@ class _TruckDocumentsPageState extends State<TruckDocumentsPage>
   late AnimationController _animationController;
   String _selectedStatusFilter = 'All';
   final List<String> _statusFilters = ['All', 'Uploaded', 'Verified'];
+  final ptr.RefreshController _refreshController =
+  ptr.RefreshController(initialRefresh: false);
 
   // Vehicle documents that can be uploaded for trucks
   final Map<String, Map<String, dynamic>> _vehicleDocuments = {
@@ -278,11 +282,13 @@ class _TruckDocumentsPageState extends State<TruckDocumentsPage>
         _applyStatusFilter();
         _isLoading = false;
       });
+      _refreshController.refreshCompleted();
     } catch (e) {
       print('Error loading truck documents: $e');
       setState(() {
         _isLoading = false;
       });
+      _refreshController.refreshFailed();
       _showErrorSnackBar('Error loading documents: ${e.toString()}');
     }
   }
@@ -547,46 +553,60 @@ class _TruckDocumentsPageState extends State<TruckDocumentsPage>
           ),
           // Trucks List
           Expanded(
-            child: _filteredTrucks.isEmpty
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            child: ptr.SmartRefresher(
+              controller: _refreshController,
+              onRefresh: _loadTruckDocuments,
+              enablePullDown: true,
+              enablePullUp: false,
+              header: const ptr.WaterDropHeader(), // nice animation
+              child: _filteredTrucks.isEmpty
+                  ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: [
-                  Icon(
-                    Icons.local_shipping_outlined,
-                    size: 64,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _userRole == UserRole.driver
-                        ? 'no_trucks_driver'.tr()
-                        : 'no_trucks_other'.tr(),
-                    style: const TextStyle(fontSize: 16),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (_userRole == UserRole.driver)
-                    Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text(
-                        'driver_hint'.tr(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
+                  const SizedBox(height: 200),
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.local_shipping_outlined,
+                          size: 64,
+                          color: Colors.grey[400],
                         ),
-                        textAlign: TextAlign.center,
-                      ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _userRole == UserRole.driver
+                              ? 'no_trucks_driver'.tr()
+                              : 'no_trucks_other'.tr(),
+                          style: const TextStyle(fontSize: 16),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (_userRole == UserRole.driver)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              'driver_hint'.tr(),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                      ],
                     ),
+                  ),
                 ],
+              )
+                  : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _filteredTrucks.length,
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemBuilder: (context, index) {
+                  final truck = _filteredTrucks[index];
+                  return _buildTruckCard(truck);
+                },
               ),
-            )
-                : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _filteredTrucks.length,
-              itemBuilder: (context, index) {
-                final truck = _filteredTrucks[index];
-                return _buildTruckCard(truck);
-              },
             ),
           ),
         ],

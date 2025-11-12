@@ -29,8 +29,6 @@ class _SharedShipmentsPageState extends State<SharedShipmentsPage> {
       if (response != null && response is List) {
         final List<Map<String, dynamic>> allShipments =
         List<Map<String, dynamic>>.from(response);
-
-        // ✅ Filter out completed shipments older than 24 hours
         final now = DateTime.now();
         final filtered = allShipments.where((shipment) {
           final status = shipment['booking_status']?.toString().toLowerCase();
@@ -43,7 +41,7 @@ class _SharedShipmentsPageState extends State<SharedShipmentsPage> {
               return now.difference(completedAt).inHours < 24;
             }
           }
-          return true; // keep all other shipments
+          return true;
         }).toList();
 
         setState(() {
@@ -66,7 +64,7 @@ class _SharedShipmentsPageState extends State<SharedShipmentsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Shared With Me")),
-      body: _buildBody(),
+      body: SafeArea(child: _buildBody()),
     );
   }
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,6 +8,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:logistics_toolkit/config/theme.dart';
 import 'package:intl/intl.dart';
 import '../../services/user_data_service.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart' as ptr;
+
 
 enum UserRole { agent, truckOwner, driver }
 
@@ -35,6 +38,9 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     'Approved',
     'Rejected',
   ];
+  final ptr.RefreshController _refreshController =
+  ptr.RefreshController(initialRefresh: false);
+
 
   // ONLY personal documents that drivers can upload
   final Map<String, Map<String, dynamic>> _personalDocuments = {
@@ -257,6 +263,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       setState(() {
         _isLoading = false;
       });
+      _refreshController.refreshCompleted();
       _showErrorSnackBar('Error loading documents: ${e.toString()}');
     }
   }
@@ -742,20 +749,33 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
           ),
           // Drivers List
           Expanded(
-            child: _filteredDrivers.isEmpty
-                ?  Center(
-              child: Text(
-                'no_drivers_found'.tr(),
-                style: TextStyle(fontSize: 16),
+            child: ptr.SmartRefresher(
+              controller: _refreshController,
+              onRefresh: _loadDriverDocuments,
+              enablePullDown: true,
+              enablePullUp: false,
+              header: const ptr.WaterDropHeader(),
+              child: _filteredDrivers.isEmpty
+                  ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  const SizedBox(height: 200),
+                  Center(
+                    child: Text(
+                      'no_drivers_found'.tr(),
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              )
+                  : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _filteredDrivers.length,
+                itemBuilder: (context, index) {
+                  final driver = _filteredDrivers[index];
+                  return _buildDriverCard(driver);
+                },
               ),
-            )
-                : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _filteredDrivers.length,
-              itemBuilder: (context, index) {
-                final driver = _filteredDrivers[index];
-                return _buildDriverCard(driver);
-              },
             ),
           ),
         ],

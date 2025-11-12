@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart' as ptr;
 
 //other page imports
 
@@ -115,6 +116,8 @@ class _MyDriverPageState extends State<MyDriverPage>
   int onLeaveDrivers = 0;
   String selectedFilter = 'All Drivers';
   bool isFirstTime = true;
+  final ptr.RefreshController _refreshController =
+  ptr.RefreshController(initialRefresh: false);
 
   @override
   void initState() {
@@ -267,9 +270,10 @@ class _MyDriverPageState extends State<MyDriverPage>
             .where((d) => d.status == 'Leave')
             .length;
         isLoading = false;
-      });
+      });_refreshController.refreshCompleted();
     } catch (e) {
       setState(() => isLoading = false);
+      _refreshController.refreshFailed();
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -392,10 +396,10 @@ class _MyDriverPageState extends State<MyDriverPage>
               );
             },
           ),
-          IconButton(
+          /*IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: fetchDriversFromSupabase,
-          ),
+          ),*/
           PopupMenuButton<String>(
             onSelected: (value) => setState(() {
               sortByRating = value == 'Rating';
@@ -507,137 +511,123 @@ class _MyDriverPageState extends State<MyDriverPage>
               ),
             ),
           Expanded(
-            child: filteredDrivers.isEmpty
-                ? Center(child: Text('no_drivers_found'.tr()))
-                : ListView.builder(
-              itemCount: filteredDrivers.length,
-              itemBuilder: (context, index) {
-                final driver = filteredDrivers[index];
-                final isAvailable = driver.status == 'Available';
-
-                return Slidable(
-                  key: ValueKey(driver.id),
-                  endActionPane: widget.isSelectionMode
-                      ? null
-                      : ActionPane(
-                    motion: const ScrollMotion(),
-                    children: [
-                      SlidableAction(
-                        onPressed: (context) async {
-                          final contact = driver.contact
-                              .trim();
-                          final url = 'tel:$contact';
-                          final uri = Uri.parse(url);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri);
-                          } else {
-                            ScaffoldMessenger.of(
-                              context,
-                            ).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  "could_not_open_dialer"
-                                      .tr(),
+            child: ptr.SmartRefresher(
+              controller: _refreshController,
+              onRefresh: fetchDriversFromSupabase,
+              enablePullDown: true,
+              enablePullUp: false,
+              header: const ptr.WaterDropHeader(),
+              child: filteredDrivers.isEmpty
+                  ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  const SizedBox(height: 200),
+                  Center(
+                    child: Text(
+                      'no_drivers_found'.tr(),
+                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
+                ],
+              )
+                  : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: filteredDrivers.length,
+                itemBuilder: (context, index) {
+                  final driver = filteredDrivers[index];
+                  final isAvailable = driver.status == 'Available';
+                  return Slidable(
+                    key: ValueKey(driver.id),
+                    endActionPane: widget.isSelectionMode
+                        ? null
+                        : ActionPane(
+                      motion: const ScrollMotion(),
+                      children: [
+                        SlidableAction(
+                          onPressed: (context) async {
+                            final contact = driver.contact.trim();
+                            final uri = Uri.parse('tel:$contact');
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri);
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content:
+                                  Text("could_not_open_dialer".tr()),
                                 ),
-                              ),
-                            );
+                              );
+                            }
+                          },
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          icon: Icons.call,
+                          label: 'Call',
+                        ),
+                      ],
+                    ),
+                    child: Card(
+                      margin: const EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 10,
+                      ),
+                      child: ListTile(
+                        onTap: () {
+                          if (widget.isSelectionMode && isAvailable) {
+                            _selectDriver(driver);
                           }
                         },
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        icon: Icons.call,
-                        label: 'Call',
-                      ),
-                    ],
-                  ),
-                  child: Card(
-                    margin: const EdgeInsets.symmetric(
-                      vertical: 6,
-                      horizontal: 10,
-                    ),
-                    child: ListTile(
-                      onTap: () {
-                        if (widget.isSelectionMode && isAvailable) {
-                          _selectDriver(driver);
-                        }
-                      },
-                      leading: CircleAvatar(
-                        backgroundColor: driver.statusColor
-                            .withOpacity(0.2),
-                        child: Icon(
-                          driver.statusIcon,
-                          color: driver.statusColor,
+                        leading: CircleAvatar(
+                          backgroundColor:
+                          driver.statusColor.withOpacity(0.2),
+                          child: Icon(driver.statusIcon, color: driver.statusColor),
                         ),
-                      ),
-                      title: Text(
-                        '${driver.name} (${driver.id})',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                        title: Text(
+                          '${driver.name} (${driver.id})',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.phone, size: 16),
-                              const SizedBox(width: 4),
-                              Text(driver.contact),
-                            ],
-                          ),
-                          if (driver.rating != null)
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Row(
                               children: [
-                                const Icon(
-                                  Icons.star,
-                                  color: Colors.amber,
-                                  size: 16,
-                                ),
+                                const Icon(Icons.phone, size: 16),
                                 const SizedBox(width: 4),
-                                Text(
-                                  driver.rating!.toStringAsFixed(1),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
+                                Text(driver.contact),
                               ],
                             ),
-                        ],
-                      ),
-                      trailing: widget.isSelectionMode
-                          ? (isAvailable
-                          ? ElevatedButton(
-                        onPressed: () =>
-                            _selectDriver(driver),
-                        child: Text('select'.tr()),
-                      )
-                          : Text(
-                        'unavailable'.tr(),
-                        style: TextStyle(
-                          color: Colors.grey,
+                            if (driver.rating != null)
+                              Row(
+                                children: [
+                                  const Icon(Icons.star,
+                                      color: Colors.amber, size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(driver.rating!.toStringAsFixed(1)),
+                                ],
+                              ),
+                          ],
                         ),
-                      ))
-                          : Column(
-                        mainAxisAlignment:
-                        MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            driver.statusIcon,
-                            color: driver.statusColor,
-                          ),
-                          Text(
-                            driver.status,
-                            style: TextStyle(
-                              color: driver.statusColor,
-                            ),
-                          ),
-                        ],
+                        trailing: widget.isSelectionMode
+                            ? (isAvailable
+                            ? ElevatedButton(
+                          onPressed: () => _selectDriver(driver),
+                          child: Text('select'.tr()),
+                        )
+                            : Text('unavailable'.tr(),
+                            style: const TextStyle(color: Colors.grey)))
+                            : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(driver.statusIcon,
+                                color: driver.statusColor),
+                            Text(driver.status,
+                                style: TextStyle(color: driver.statusColor)),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
         ],

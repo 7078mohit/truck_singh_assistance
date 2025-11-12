@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:logistics_toolkit/config/theme.dart';
-
 import 'package:printing/printing.dart';
 import 'dart:io';
 
@@ -13,7 +12,7 @@ class PdfPreviewPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Theme(
-      data: Theme.of(context), // uses whatever theme (dark/light) is active
+      data: Theme.of(context),
       child: Scaffold(
         appBar: AppBar(
           title: Text(
@@ -21,8 +20,10 @@ class PdfPreviewPage extends StatelessWidget {
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: Colors.white),
           ),
         ),
-        body: PdfPreview(
-          build: (format) async => pdfFile.readAsBytes(),
+        body: SafeArea(
+          child: PdfPreview(
+            build: (format) async => pdfFile.readAsBytes(),
+          ),
         ),
       ),
     );

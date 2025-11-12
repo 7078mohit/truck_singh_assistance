@@ -29,9 +29,6 @@ import 'package:logistics_toolkit/features/tracking/shared_shipments_page.dart';
 import '../features/ratings/presentation/screen/trip_ratings.dart';
 import 'package:logistics_toolkit/features/Report%20Analysis/report_chart.dart';
 
-
-
-// A simple model to hold the dashboard's state
 class DashboardState {
   final bool isLoading;
   final String? error;
@@ -304,116 +301,42 @@ class _TruckOwnerDashboardState extends State<TruckOwnerDashboard> {
           childAspectRatio: 1.1,
           children: [
             FeatureCard(
-              title: 'my_trucks'.tr(),
-              subtitle: 'add_manage_fleet'.tr(),
-              icon: Icons.local_shipping_outlined,
-              color: Colors.blue,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const Mytrucks()),
-              ),
-            ),
-            FeatureCard(
-              title: 'my_chats'.tr(),
-              subtitle: 'chat_with_drivers'.tr(),
-              icon: Icons.chat_bubble_outline,
+              title: 'findShipments'.tr(),
+              subtitle: 'availableLoads'.tr(),
+              icon: Icons.search_outlined,
               color: Colors.teal,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const AgentChatListPage()),
-              ),
-            ),
-            FeatureCard(
-              title: 'track_vehicles'.tr(),
-              subtitle: 'live_fleet_tracking'.tr(),
-              icon: Icons.map_outlined,
-              color: Colors.orange,
-              onTap: () {
-                if (customUserId != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          TrackTrucksPage(truckOwnerId: customUserId),
-                    ),
-                  );
-                } else {
-                  _showErrorSnackBar('error_tracking_user_id'.tr());
-                }
-              },
-            ),
-            FeatureCard(
-              title: 'complaints'.tr(),
-              subtitle: 'view_history'.tr(),
-              icon: Icons.feedback_outlined,
-              color: Colors.red,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ComplaintHistoryPage()),
-              ),
-            ),
-            FeatureCard(
-              title: 'driverDocuments'.tr(),
-              subtitle: 'manageDriverRecords'.tr(),
-              icon: Icons.person_outline,
-              color: Colors.deepPurple,
-              onTap: () => Navigator.push(
-                context,
                 MaterialPageRoute(
-                  builder: (context) => const DriverDocumentsPage(),
+                  builder: (_) => BlocProvider(
+                    create: (context) => ShipmentCubit(),
+                    child: const LoadAssignmentScreen(),
+                  ),
                 ),
               ),
+            ), FeatureCard(
+              title: 'createShipment'.tr(),
+              subtitle: 'postNewLoad'.tr(),
+              icon: Icons.add_box_rounded,
+              color: Colors.teal,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ShipperFormPage()),
+              ),
             ),
             FeatureCard(
-              title: 'truckDocuments'.tr(),
-              subtitle: 'documents_subtitle'.tr(),
-              icon: Icons.local_shipping_outlined,
+              title: 'loadBoard'.tr(),
+              subtitle: 'browsePostLoads'.tr(),
+              icon: Icons.view_list_outlined,
               color: Colors.blue,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const TruckDocumentsPage(),
+                  builder: (_) => BlocProvider(
+                    create: (context) => ShipmentCubit(),
+                    child: const allLoadsPage(),
+                  ),
                 ),
-              ),
-            ),
-            FeatureCard(
-              title: 'bilty'.tr(),
-              subtitle: 'createConsignmentNote'.tr(),
-              icon: Icons.receipt_long,
-              color: Colors.green,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ShipmentSelectionPage(),),
-              ),
-            ),
-            FeatureCard(
-              title: 'myTrips'.tr(),
-              subtitle: 'historyDetails'.tr(),
-              icon: Icons.route_outlined,
-              color: Colors.blueGrey,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const MyTripsHistory()),
-              ),
-            ),
-            FeatureCard(
-              title: 'ratings'.tr(),
-              subtitle: 'viewRatings'.tr(),
-              icon: Icons.star_outline,
-              color: Colors.orange,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const TripRatingsPage()),
-              ),
-            ),
-            FeatureCard(
-              title: 'myDrivers'.tr(),
-              subtitle: 'addTrackDrivers'.tr(),
-              icon: Icons.people_outlined,
-              color: Colors.deepPurple,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const MyDriverPage()),
               ),
             ),
             FeatureCard(
@@ -439,43 +362,116 @@ class _TruckOwnerDashboardState extends State<TruckOwnerDashboard> {
               ),
             ),
             FeatureCard(
-              title: 'loadBoard'.tr(),
-              subtitle: 'browsePostLoads'.tr(),
-              icon: Icons.view_list_outlined,
+              title: 'track_vehicles'.tr(),
+              subtitle: 'live_fleet_tracking'.tr(),
+              icon: Icons.map_outlined,
+              color: Colors.orange,
+              onTap: () {
+                if (customUserId != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          TrackTrucksPage(truckOwnerId: customUserId),
+                    ),
+                  );
+                } else {
+                  _showErrorSnackBar('error_tracking_user_id'.tr());
+                }
+              },
+            ),
+            FeatureCard(
+              title: 'my_trucks'.tr(),
+              subtitle: 'add_manage_fleet'.tr(),
+              icon: Icons.local_shipping_outlined,
+              color: Colors.blue,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const Mytrucks()),
+              ),
+            ),
+            FeatureCard(
+              title: 'myDrivers'.tr(),
+              subtitle: 'addTrackDrivers'.tr(),
+              icon: Icons.people_outlined,
+              color: Colors.deepPurple,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const MyDriverPage()),
+              ),
+            ),
+            FeatureCard(
+              title: 'truckDocuments'.tr(),
+              subtitle: 'documents_subtitle'.tr(),
+              icon: Icons.local_shipping_outlined,
               color: Colors.blue,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => BlocProvider(
-                    create: (context) => ShipmentCubit(),
-                    child: const allLoadsPage(),
-                  ),
+                  builder: (context) => const TruckDocumentsPage(),
                 ),
               ),
             ),
             FeatureCard(
-              title: 'createShipment'.tr(),
-              subtitle: 'postNewLoad'.tr(),
-              icon: Icons.add_box_rounded,
-              color: Colors.teal,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ShipperFormPage()),
-              ),
-            ),
-            FeatureCard(
-              title: 'findShipments'.tr(),
-              subtitle: 'availableLoads'.tr(),
-              icon: Icons.search_outlined,
-              color: Colors.teal,
+              title: 'driverDocuments'.tr(),
+              subtitle: 'manageDriverRecords'.tr(),
+              icon: Icons.person_outline,
+              color: Colors.deepPurple,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => BlocProvider(
-                    create: (context) => ShipmentCubit(),
-                    child: const LoadAssignmentScreen(),
-                  ),
+                  builder: (context) => const DriverDocumentsPage(),
                 ),
+              ),
+            ),
+            FeatureCard(
+              title: 'myTrips'.tr(),
+              subtitle: 'historyDetails'.tr(),
+              icon: Icons.route_outlined,
+              color: Colors.blueGrey,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const MyTripsHistory()),
+              ),
+            ),
+            FeatureCard(
+              title: 'my_chats'.tr(),
+              subtitle: 'chat_with_drivers'.tr(),
+              icon: Icons.chat_bubble_outline,
+              color: Colors.teal,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AgentChatListPage()),
+              ),
+            ),
+            FeatureCard(
+              title: 'bilty'.tr(),
+              subtitle: 'createConsignmentNote'.tr(),
+              icon: Icons.receipt_long,
+              color: Colors.green,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ShipmentSelectionPage(),),
+              ),
+            ),
+            FeatureCard(
+              title: 'ratings'.tr(),
+              subtitle: 'viewRatings'.tr(),
+              icon: Icons.star_outline,
+              color: Colors.orange,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TripRatingsPage()),
+              ),
+            ),
+            FeatureCard(
+              title: 'complaints'.tr(),
+              subtitle: 'view_history'.tr(),
+              icon: Icons.feedback_outlined,
+              color: Colors.red,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ComplaintHistoryPage()),
               ),
             ),
           ],

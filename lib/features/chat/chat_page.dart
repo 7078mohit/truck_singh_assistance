@@ -47,6 +47,14 @@ class _ChatPageState extends State<ChatPage> {
     super.dispose();
   }
 
+  Future<void> _refreshMessages() async {
+    await _chatService.markRoomAsRead(widget.roomId);
+    setState(() {
+      _messagesStream = _chatService.getMessagesStream(widget.roomId);
+    });
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
   void _sendMessage() {
     if (_messageController.text.trim().isEmpty) return;
     _chatService.sendMessage(
@@ -162,47 +170,61 @@ class _ChatPageState extends State<ChatPage> {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(child: Text('no_messages'.tr()));
+                  return RefreshIndicator(
+                    onRefresh: _refreshMessages,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.6,
+                        child: Center(child: Text('no_messages'.tr())),
+                      ),
+                    ),
+                  );
                 }
 
                 final messages = snapshot.data!;
 
-                return ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  reverse: true,
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final message = messages[index];
-                    final isMine = message['sender_id'] == _currentCustomUserId;
-                    final senderProfile =
-                        message['sender'] as Map<String, dynamic>? ?? {};
-                    final senderName =
-                        senderProfile['name'] as String? ?? 'Unknown';
-                    final senderRole = senderProfile['role'] as String? ?? '';
-                    final timestamp = message['created_at'] as String?;
-                    final messageType = message['message_type'] ?? 'text';
-                    final attachmentUrl = message['attachment_url'];
-                    final content = message['content'] as String? ?? '';
+                return RefreshIndicator(
+                  onRefresh: _refreshMessages,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    reverse: true,
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final message = messages[index];
+                      final isMine =
+                          message['sender_id'] == _currentCustomUserId;
+                      final senderProfile =
+                          message['sender'] as Map<String, dynamic>? ?? {};
+                      final senderName =
+                          senderProfile['name'] as String? ?? 'Unknown';
+                      final senderRole = senderProfile['role'] as String? ?? '';
+                      final timestamp = message['created_at'] as String?;
+                      final messageType = message['message_type'] ?? 'text';
+                      final attachmentUrl = message['attachment_url'];
+                      final content = message['content'] as String? ?? '';
 
-                    if (messageType == 'attachment' && attachmentUrl != null) {
-                      return _AttachmentBubble(
-                        url: attachmentUrl,
-                        caption: content,
+                      if (messageType == 'attachment' &&
+                          attachmentUrl != null) {
+                        return _AttachmentBubble(
+                          url: attachmentUrl,
+                          caption: content,
+                          isMine: isMine,
+                          senderName: senderName,
+                          senderRole: senderRole,
+                          timestamp: timestamp,
+                        );
+                      }
+
+                      return _MessageBubble(
+                        message: content,
                         isMine: isMine,
-                        senderName: senderName,
+                        senderName: isMine ? 'You' : senderName,
                         senderRole: senderRole,
                         timestamp: timestamp,
                       );
-                    }
-
-                    return _MessageBubble(
-                      message: content,
-                      isMine: isMine,
-                      senderName: isMine ? 'You' : senderName,
-                      senderRole: senderRole,
-                      timestamp: timestamp,
-                    );
-                  },
+                    },
+                  ),
                 );
               },
             ),
@@ -304,8 +326,9 @@ class _MessageBubble extends StatelessWidget {
     }
 
     return Column(
-      crossAxisAlignment:
-      isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: isMine
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         if (!isMine)
           Padding(
@@ -320,13 +343,13 @@ class _MessageBubble extends StatelessWidget {
             ),
           ),
         Row(
-          mainAxisAlignment:
-          isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+          mainAxisAlignment: isMine
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
           children: [
             Flexible(
               child: Container(
-                margin:
-                const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                 padding: const EdgeInsets.symmetric(
                   vertical: 10,
                   horizontal: 14,
@@ -340,10 +363,12 @@ class _MessageBubble extends StatelessWidget {
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(16),
                     topRight: const Radius.circular(16),
-                    bottomLeft:
-                    isMine ? const Radius.circular(16) : Radius.zero,
-                    bottomRight:
-                    isMine ? Radius.zero : const Radius.circular(16),
+                    bottomLeft: isMine
+                        ? const Radius.circular(16)
+                        : Radius.zero,
+                    bottomRight: isMine
+                        ? Radius.zero
+                        : const Radius.circular(16),
                   ),
                 ),
                 child: Text(
@@ -415,8 +440,9 @@ class _AttachmentBubble extends StatelessWidget {
     }
 
     return Column(
-      crossAxisAlignment:
-      isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: isMine
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         if (!isMine)
           Padding(
@@ -442,8 +468,7 @@ class _AttachmentBubble extends StatelessWidget {
                 onTap: () async {
                   final uri = Uri.parse(url);
                   if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri,
-                        mode: LaunchMode.externalApplication);
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
                 },
                 child: _isImage
@@ -470,8 +495,7 @@ class _AttachmentBubble extends StatelessWidget {
               ),
               if (caption.isNotEmpty && !caption.startsWith('Attachment:'))
                 Padding(
-                  padding:
-                  const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                   child: Text(caption),
                 ),
             ],

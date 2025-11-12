@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:logistics_toolkit/features/trips/shipment_details.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -21,6 +22,7 @@ class _TrackTrucksPageState extends State<TrackTrucksPage> {
   List<String> _driverIds = [];
   bool _isLoading = true;
   String? _errorMessage;
+  int _fetchLimit = 100;
 
   @override
   void initState() {
@@ -57,16 +59,29 @@ class _TrackTrucksPageState extends State<TrackTrucksPage> {
   }
 
   Future<void> _fetchInitialLocations() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     try {
-      // UPDATE: Call the new, corrected database function.
       final response = await supabase.rpc(
         'get_loc_for_owner_drivers',
         params: {'p_owner_id': widget.truckOwnerId},
-      );
+      ).limit(_fetchLimit);
 
       _driverIds = (response as List<dynamic>)
           .map<String>((e) => e['custom_user_id'].toString())
           .toList();
+
+      if (response.length >= _fetchLimit) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Warning: The number of fetched locations reached the maximum limit of $_fetchLimit. Some trucks may not be displayed.')),
+        );
+      }else{
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      }
 
       _updateMarkersFromData(response);
     } catch (e) {
@@ -118,6 +133,106 @@ class _TrackTrucksPageState extends State<TrackTrucksPage> {
     }
   }
 
+  Future<void> _navigateToShipmentDetails(String driverId) async {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Fetching shipment details...')),
+    );
+
+    try {
+      final response = await supabase
+          .from('shipment')
+          .select()
+          .eq('assigned_driver', driverId)
+          .neq('booking_status', 'Completed')
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      if (!mounted) return;
+
+      if (response != null) {
+        final shipment = response;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ShipmentDetailsPage(
+              shipment: shipment,
+              isHistoryPage: false,
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No active shipment found for this driver.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: Failed to get shipment details. $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showLimitDialog() async {
+    final List<int?> limits = [10, 20, 50, 100];
+
+    final selectedValue = await showDialog<int?>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setStateInDialog) {
+            return AlertDialog(
+              title: const Text('Driver Display Limit'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: limits.map((limit) {
+                    return RadioListTile<int?>(
+                      title: Text(limit.toString()),
+                      value: limit,
+                      groupValue: _fetchLimit,
+                      onChanged: (value) {
+                        Navigator.of(context).pop(value);
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Cancel'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (selectedValue != null && selectedValue != _fetchLimit) {
+      setState(() {
+        _fetchLimit = selectedValue;
+      });
+      await _fetchInitialLocations();
+    }
+  }
+
+
   Marker? _createMarkerFromData(Map<String, dynamic> item) {
     final lat = item['location_lat'];
     final lng = item['location_lng'];
@@ -139,7 +254,10 @@ class _TrackTrucksPageState extends State<TrackTrucksPage> {
       alpha: isStale ? 0.6 : 1.0,
       infoWindow: InfoWindow(
         title: "Driver $customUserId",
-        snippet: "Updated: ${_formatTimestamp(lastUpdatedAt)}",
+        snippet: "Updated: ${_formatTimestamp(lastUpdatedAt)}\nTap for shipment details",
+        onTap: () {
+          _navigateToShipmentDetails(customUserId);
+        },
       ),
     );
   }
@@ -208,6 +326,12 @@ class _TrackTrucksPageState extends State<TrackTrucksPage> {
         title: const Text("Track My Trucks"),
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: _showLimitDialog,
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -217,7 +341,7 @@ class _TrackTrucksPageState extends State<TrackTrucksPage> {
               _zoomToFitMarkers();
             },
             initialCameraPosition: const CameraPosition(
-              target: LatLng(20.5937, 78.9629), // Center of India
+              target: LatLng(20.5937, 78.9629),
               zoom: 5,
             ),
             markers: Set.of(_markers.values),

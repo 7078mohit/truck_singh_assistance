@@ -659,12 +659,12 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
     // Get user profile
     final profile = await Supabase.instance.client
         .from('user_profiles')
-        .select('custom_user_id,name,role') // adjust fields as needed
+        .select('custom_user_id,name,role')
         .eq('user_id', userId)
         .maybeSingle();
     final shipperId = profile?['custom_user_id'];
     final userRole =
-    profile?['role']; // or check agent/shipper with custom_user_id or other logic
+    profile?['role'];
 
     String? pdfPath;
 
@@ -683,16 +683,12 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
     }
 
     if (pdfPath != null && pdfPath.isNotEmpty) {
-      // IMPORTANT: getPublicUrl returns an object, get .data to extract URL string
       final publicUrlResponse = Supabase.instance.client.storage
           .from('invoices')
           .getPublicUrl(pdfPath);
-      //final pdfUrl = publicUrlResponse.data;
-
       final pdfUrl = Supabase.instance.client.storage
           .from('invoices')
           .getPublicUrl(pdfPath);
-
       if (pdfUrl == null || pdfUrl.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('could_not_generate_pdf_url'.tr())),
@@ -766,7 +762,6 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
     if (result != true) return;
 
     try {
-      // Get user info for correct bucket path
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
       final profile = await Supabase.instance.client
@@ -776,28 +771,20 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
           .maybeSingle();
       final shipperId = profile?['custom_user_id'];
       if (shipperId == null) throw Exception('Shipper ID not found');
-
-      // Delete PDF from Supabase bucket
       final bucketFilePath = '$shipperId/$shipmentId.pdf';
       await Supabase.instance.client.storage
           .from('invoices')
           .remove([bucketFilePath]);
-
-      // Delete local PDF file
       final appDir = await getApplicationDocumentsDirectory();
       final localPath = '${appDir.path}/$shipmentId.pdf';
       final file = File(localPath);
       if (await file.exists()) {
         await file.delete();
       }
-
-      // Update Supabase to clear invoice link and status
       await Supabase.instance.client
           .from('shipment')
           .update({'Invoice_link': null})
           .eq('shipment_id', shipmentId);
-
-      // Update local shipment map and UI button state
       shipment['Invoice_link'] = null;
       shipment['hasInvoice'] = false;
       if (mounted) {
@@ -906,21 +893,18 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
           labelText: label,
           prefixIcon: icon != null ? Icon(icon) : null,
           filled: true,
-          //fillColor: Colors.grey.shade100,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            //borderSide: BorderSide(color: Colors.grey.shade400),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            //borderSide: BorderSide(color: Colors.grey.shade300),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
               color: Colors.blueAccent,
               width: 1.5,
-            ), // theme accent
+            ),
           ),
         ),
       ),
@@ -1025,18 +1009,7 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
                       return shipment_card.ShipmentCard(
                         shipment: shipment,
                         pdfStates: pdfStates,
-                        //pdfState: pdfStates[shipment['shipment_id'].toString()] ?? PdfState.notGenerated,
                         onTap: () {
-                          /*Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  ShipmentDetailsPage(
-                                    shipment: shipment,
-                                    isHistoryPage: true,
-                                  ),
-                            ),
-                          );*/
                           print(
                             "Building card for shipment ID: ${shipment['shipment_id']}, pdfState: $pdfStates",
                           );
@@ -1047,11 +1020,8 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
                             shipment['shipment_id'].toString(),
                           );
                         },
-                        // if (pdfState == PdfState.uploaded)
                         onDownloadInvoice: () async {
                           await downloadInvoice(shipment);
-
-                          // Update state to "downloaded"
                           setState(() {
                             pdfStates[shipment['shipment_id']
                                 .toString()] =
@@ -1736,7 +1706,6 @@ class ShipmentSearchDelegate extends SearchDelegate<String> {
 class PdfPreviewScreen extends StatelessWidget {
   final String localPath;
   const PdfPreviewScreen({required this.localPath, Key? key}) : super(key: key);
-
   void sharePdf() {
     Share.shareXFiles([XFile(localPath)], text: 'sharing_invoice_pdf'.tr());
   }
@@ -1754,7 +1723,7 @@ class PdfPreviewScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: PDFView(filePath: localPath),
+      body: SafeArea(child: PDFView(filePath: localPath)),
     );
   }
 }

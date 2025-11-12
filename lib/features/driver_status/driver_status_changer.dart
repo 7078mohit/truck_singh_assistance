@@ -4,6 +4,7 @@ import 'package:logistics_toolkit/features/tracking/driver_route_tracking.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart' as ptr;
 
 class DriverStatusChanger extends StatefulWidget {
   final String driverId;
@@ -18,6 +19,8 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
   final SupabaseClient supabase = Supabase.instance.client;
   Map<String, dynamic>? currentShipment;
   bool isLoading = false;
+  final ptr.RefreshController _refreshController =
+  ptr.RefreshController(initialRefresh: false);
 
   final List<Map<String, dynamic>> statusFlow = [
     {
@@ -107,11 +110,13 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
         currentShipment = response;
         isLoading = false;
       });
+      _refreshController.refreshCompleted();
     } catch (e) {
       setState(() {
         currentShipment = null;
         isLoading = false;
       });
+      _refreshController.refreshFailed();
     }
   }
 
@@ -512,53 +517,54 @@ class _DriverStatusChangerState extends State<DriverStatusChanger> {
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
         elevation: 0,
-        actions: [
-          IconButton(
-            onPressed: fetchCurrentShipment,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
       ),
-      body: isLoading && currentShipment == null
-          ? const Center(child: CircularProgressIndicator())
-          : currentShipment == null
-          ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      body: ptr.SmartRefresher(
+        controller: _refreshController,
+        onRefresh: fetchCurrentShipment,
+        enablePullDown: true,
+        enablePullUp: false,
+        header: const ptr.WaterDropHeader(), // Nice pull-down animation
+        child: isLoading && currentShipment == null
+            ? const Center(child: CircularProgressIndicator())
+            : currentShipment == null
+            ? ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            Icon(
-              Icons.assignment_turned_in,
-              size: 80,
-              color: Colors.grey[400],
-            ),
+            const SizedBox(height: 100),
+            Icon(Icons.assignment_turned_in, size: 80, color: Colors.grey),
             const SizedBox(height: 24),
-            Text(
-              'no_active_shipment'.tr(),
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+            Center(
+              child: Text(
+                'no_active_shipment'.tr(),
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700],
+                ),
               ),
             ),
-            SizedBox(height: 8),
-            Text(
-              'no_shipments_assigned'.tr(),
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                'no_shipments_assigned'.tr(),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+              ),
             ),
           ],
-        ),
-      )
-          : SingleChildScrollView(
-        child: Column(
-          children: [
-            buildProgressIndicator(),
-            buildCurrentStatusCard(),
-            const SizedBox(height: 20),
-            buildShipmentDetails(),
-            buildActionButton(),
-            const SizedBox(height: 20),
-          ],
+        )
+            : SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              buildProgressIndicator(),
+              buildCurrentStatusCard(),
+              const SizedBox(height: 20),
+              buildShipmentDetails(),
+              buildActionButton(),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: _buildBottomAppBar(),

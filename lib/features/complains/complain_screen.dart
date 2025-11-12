@@ -144,8 +144,8 @@ class _ComplaintPageState extends State<ComplaintPage> {
       final data = await Supabase.instance.client
           .from('shipment')
           .select(
-            'assigned_driver, assigned_agent, shipper_id, assigned_company, assigned_truckowner',
-          )
+        'assigned_driver, assigned_agent, shipper_id, assigned_company, assigned_truckowner',
+      )
           .eq('shipment_id', widget.preFilledShipmentId!)
           .single()
           .timeout(const Duration(seconds: 15));
@@ -316,7 +316,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
         String errorMessage = 'Error fetching your profile';
         if (e.toString().contains('TimeoutException')) {
           errorMessage =
-              'Network timeout. Please check your connection and try again.';
+          'Network timeout. Please check your connection and try again.';
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -346,7 +346,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
             _isVerifyingRecipient = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(
+            SnackBar(
               content: Text('cannot_file_self'.tr()),
               backgroundColor: Colors.red,
             ),
@@ -394,7 +394,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
 
         if (e.toString().contains('TimeoutException')) {
           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(
+            SnackBar(
               content: Text(
                 'network_timeout'.tr(),
               ),
@@ -411,7 +411,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
     if (!_formKey.currentState!.validate()) return;
     if (_recipientProfile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-         SnackBar(
+        SnackBar(
           content: Text('verify_recipient'.tr()),
           backgroundColor: Colors.red,
         ),
@@ -476,7 +476,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(
+          SnackBar(
             content: Text('complaint_submitted'.tr()),
             backgroundColor: Colors.green,
           ),
@@ -488,10 +488,10 @@ class _ComplaintPageState extends State<ComplaintPage> {
         String errorMessage = 'Error submitting complaint';
         if (e.toString().contains('TimeoutException')) {
           errorMessage =
-              'Network timeout. Please check your connection and try again.';
+          'Network timeout. Please check your connection and try again.';
         } else if (e.toString().contains('HandshakeException')) {
           errorMessage =
-              'Connection failed. Please check your internet connection.';
+          'Connection failed. Please check your internet connection.';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -532,27 +532,28 @@ class _ComplaintPageState extends State<ComplaintPage> {
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
       ),
-      // Updated: Check both loading states
-      body: _isFetchingSender || _isFetchingShipment
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildInfoCard('Sender (You)', _senderProfile),
-                    const SizedBox(height: 16),
-                    _buildRecipientCard(),
-                    const SizedBox(height: 16),
-                    _buildComplaintForm(),
-                    const SizedBox(height: 24),
-                    _buildSubmitButton(),
-                  ],
-                ),
-              ),
+      body: SafeArea(
+        child: _isFetchingSender || _isFetchingShipment
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildInfoCard('Sender (You)', _senderProfile),
+                const SizedBox(height: 16),
+                _buildRecipientCard(),
+                const SizedBox(height: 16),
+                _buildComplaintForm(),
+                const SizedBox(height: 24),
+                _buildSubmitButton(),
+              ],
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -566,7 +567,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
             Text(title, style: Theme.of(context).textTheme.titleLarge),
             const Divider(height: 20),
             if (profile == null)
-               Text(
+              Text(
                 'could_not_load_profile_info'.tr(),
                 style: TextStyle(color: Colors.red),
               )
@@ -613,7 +614,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
               items: _filteredRecipientRoles
                   .map(
                     (role) => DropdownMenuItem(value: role, child: Text(role)),
-                  )
+              )
                   .toList(),
               // Updated: onChanged now triggers the autofill
               onChanged: (value) {
@@ -667,21 +668,21 @@ class _ComplaintPageState extends State<ComplaintPage> {
                   border: const OutlineInputBorder(),
                   suffixIcon: _isVerifyingRecipient
                       ? const Padding(
-                          padding: EdgeInsets.all(12.0),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
+                    padding: EdgeInsets.all(12.0),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
                       : (_recipientProfile != null
-                            ? const Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                              )
-                            : (_recipientIdController.text.isNotEmpty
-                                  ? const Icon(Icons.error, color: Colors.red)
-                                  : null)),
+                      ? const Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                  )
+                      : (_recipientIdController.text.isNotEmpty
+                      ? const Icon(Icons.error, color: Colors.red)
+                      : null)),
                 ),
                 validator: (value) => value == null || value.isEmpty
                     ? 'Recipient ID is required'
@@ -700,7 +701,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
                 )
               else if (_recipientIdController.text.isNotEmpty &&
                   !_isVerifyingRecipient)
-                 Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 8.0),
                   child: Text(
                     'user_not_found_with_role'.tr(),
@@ -736,15 +737,15 @@ class _ComplaintPageState extends State<ComplaintPage> {
               items: _preBuiltSubjects
                   .map(
                     (subject) =>
-                        DropdownMenuItem(value: subject, child: Text(subject)),
-                  )
+                    DropdownMenuItem(value: subject, child: Text(subject)),
+              )
                   .toList(),
               onChanged: (value) => setState(() {
                 _selectedSubject = value;
                 _showCustomSubject = value == 'Other';
               }),
               validator: (value) =>
-                  value == null ? 'Please select a subject' : null,
+              value == null ? 'Please select a subject' : null,
             ),
             if (_showCustomSubject) ...[
               const SizedBox(height: 12),
@@ -816,14 +817,14 @@ class _ComplaintPageState extends State<ComplaintPage> {
       onPressed: _isLoading ? null : _submitComplaint,
       icon: _isLoading
           ? Container(
-              width: 24,
-              height: 24,
-              padding: const EdgeInsets.all(2.0),
-              child: const CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 3,
-              ),
-            )
+        width: 24,
+        height: 24,
+        padding: const EdgeInsets.all(2.0),
+        child: const CircularProgressIndicator(
+          color: Colors.white,
+          strokeWidth: 3,
+        ),
+      )
           : const Icon(Icons.send),
       label:  Text('submit_complaint'.tr()),
       style: ElevatedButton.styleFrom(

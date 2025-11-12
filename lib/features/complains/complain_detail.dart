@@ -3,8 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
-
-// Import the other pages to ensure navigation works
 import 'complain_screen.dart';
 
 class ComplaintDetailsPage extends StatefulWidget {
@@ -77,43 +75,38 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
 
     _complaintChannel!
         .onPostgresChanges(
-          // Listen for all events (INSERT, UPDATE, DELETE)
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'complaints',
-          // Use the PostgresChangeFilter object to filter by ID
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'id',
-            value: complaintId,
-          ),
-          callback: (payload) {
-            // Inside the single callback, check what kind of event happened
-            if (mounted) {
-              if (payload.eventType == 'UPDATE') {
-                // Handle the UPDATE event
-                setState(() {
-                  _currentComplaint = payload.newRecord;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('complaint_updated'.tr()),
-                    backgroundColor: Colors.blue,
-                  ),
-                );
-              } else if (payload.eventType == 'DELETE') {
-                // Handle the DELETE event
-                ScaffoldMessenger.of(context).showSnackBar(
-                   SnackBar(
-                    content: Text('complaint_deleted'.tr()),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-                Navigator.of(context).pop();
-              }
-            }
-          },
-        )
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'complaints',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'id',
+        value: complaintId,
+      ),
+      callback: (payload) {
+        if (mounted) {
+          if (payload.eventType == 'UPDATE') {
+            setState(() {
+              _currentComplaint = payload.newRecord;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('complaint_updated'.tr()),
+                backgroundColor: Colors.blue,
+              ),
+            );
+          } else if (payload.eventType == 'DELETE') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('complaint_deleted'.tr()),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            Navigator.of(context).pop();
+          }
+        }
+      },
+    )
         .subscribe();
   }
 
@@ -183,8 +176,8 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
         final attachmentUrl = _currentComplaint['attachment_url'];
         if (attachmentUrl != null) {
           final pathMatch =
-              RegExp(r'/storage/v1/object/public/complaint-attachments/(.+)')
-                  .firstMatch(attachmentUrl);
+          RegExp(r'/storage/v1/object/public/complaint-attachments/(.+)')
+              .firstMatch(attachmentUrl);
           if (pathMatch != null) {
             final filePath = pathMatch.group(1);
             if (filePath != null) {
@@ -215,7 +208,7 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
       String action, String title, String eventType, String eventTitle) async {
     final justificationController = TextEditingController();
     final confirmed =
-        await _showJustificationDialog(title, action, justificationController);
+    await _showJustificationDialog(title, action, justificationController);
 
     if (confirmed == true) {
       _performAction(() async {
@@ -231,7 +224,7 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
         final existingHistory =
             _currentComplaint['history'] as Map<String, dynamic>? ?? {};
         final events =
-            List<dynamic>.from(existingHistory['events'] as List? ?? []);
+        List<dynamic>.from(existingHistory['events'] as List? ?? []);
         events.add(historyEvent);
 
         try {
@@ -271,7 +264,7 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
       final existingHistory =
           _currentComplaint['history'] as Map<String, dynamic>? ?? {};
       final events =
-          List<dynamic>.from(existingHistory['events'] as List? ?? []);
+      List<dynamic>.from(existingHistory['events'] as List? ?? []);
       events.add(historyEvent);
 
       try {
@@ -295,37 +288,38 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      //backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title:Text('complaint_details_section'.tr()),
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _refreshComplaint,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildStatusHeader(),
-                    const SizedBox(height: 16),
-                    _buildBasicInfo(),
-                    const SizedBox(height: 16),
-                    _buildTimeline(),
-                    const SizedBox(height: 16),
-                    _buildComplaintDetails(),
-                    const SizedBox(height: 16),
-                    if (_currentComplaint['attachment_url'] != null)
-                      _buildAttachment(),
-                    const SizedBox(height: 16),
-                    _buildActions(),
-                  ],
-                ),
-              ),
+      body: SafeArea(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+          onRefresh: _refreshComplaint,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildStatusHeader(),
+                const SizedBox(height: 16),
+                _buildBasicInfo(),
+                const SizedBox(height: 16),
+                _buildTimeline(),
+                const SizedBox(height: 16),
+                _buildComplaintDetails(),
+                const SizedBox(height: 16),
+                if (_currentComplaint['attachment_url'] != null)
+                  _buildAttachment(),
+                const SizedBox(height: 16),
+                _buildActions(),
+              ],
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -415,7 +409,7 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
   Widget _buildTimeline() {
     final history = _currentComplaint['history'] as Map<String, dynamic>?;
     final events =
-        List<Map<String, dynamic>>.from(history?['events'] as List? ?? []);
+    List<Map<String, dynamic>>.from(history?['events'] as List? ?? []);
 
     if (events.isEmpty) {
       events.add({
@@ -440,7 +434,7 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
             const Divider(height: 24),
             ...List.generate(
                 events.length,
-                (index) => _buildTimelineItem(events[index],
+                    (index) => _buildTimelineItem(events[index],
                     isLast: index == events.length - 1)),
           ],
         ),
@@ -509,7 +503,7 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
             Text(
               _currentComplaint['complaint'] ?? 'No details provided',
               style:
-                  Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
+              Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
             ),
           ],
         ),
@@ -603,22 +597,22 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
                 ],
               )
             else if (canEdit)
-              ElevatedButton.icon(
-                  onPressed: _editComplaint,
-                  icon: const Icon(Icons.edit),
-                  label: Text('edit_complaint'.tr()))
-            else if (canAppeal)
-              ElevatedButton.icon(
-                  onPressed: _appealComplaint,
-                  icon: const Icon(Icons.undo),
-                  label: Text('appeal_decision_btn'.tr()),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white))
-            else
-              Text('no_actions'.tr(),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey)),
+                ElevatedButton.icon(
+                    onPressed: _editComplaint,
+                    icon: const Icon(Icons.edit),
+                    label: Text('edit_complaint'.tr()))
+              else if (canAppeal)
+                  ElevatedButton.icon(
+                      onPressed: _appealComplaint,
+                      icon: const Icon(Icons.undo),
+                      label: Text('appeal_decision_btn'.tr()),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white))
+                else
+                  Text('no_actions'.tr(),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey)),
             if (isComplaintOwner) ...[
               const SizedBox(height: 8),
               TextButton.icon(
@@ -640,19 +634,19 @@ class _ComplaintDetailsPageState extends State<ComplaintDetailsPage> {
     showDialog(
         context: context,
         builder: (context) => Dialog(
-              child: Stack(
-                alignment: Alignment.topRight,
-                children: [
-                  Image.network(imageUrl),
-                  IconButton(
-                    icon: const CircleAvatar(
-                        backgroundColor: Colors.black54,
-                        child: Icon(Icons.close, color: Colors.white)),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
+          child: Stack(
+            alignment: Alignment.topRight,
+            children: [
+              Image.network(imageUrl),
+              IconButton(
+                icon: const CircleAvatar(
+                    backgroundColor: Colors.black54,
+                    child: Icon(Icons.close, color: Colors.white)),
+                onPressed: () => Navigator.of(context).pop(),
               ),
-            ));
+            ],
+          ),
+        ));
   }
 
   Future<bool?> _showConfirmationDialog(String title, String content,

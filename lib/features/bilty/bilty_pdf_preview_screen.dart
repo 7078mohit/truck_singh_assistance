@@ -40,9 +40,11 @@ class _BiltyPdfPreviewScreenState extends State<BiltyPdfPreviewScreen> {
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: Colors.white),
           ),
         ),
-        body: PdfViewPinch(
-          controller: _pdfController,
-          scrollDirection: Axis.vertical,
+        body: SafeArea(
+          child: PdfViewPinch(
+            controller: _pdfController,
+            scrollDirection: Axis.vertical,
+          ),
         ),
       ),
     );

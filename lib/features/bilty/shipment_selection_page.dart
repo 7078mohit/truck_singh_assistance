@@ -281,130 +281,129 @@ class _ShipmentSelectionPageState extends State<ShipmentSelectionPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title:  Text("selectShipmentForBilty".tr())),
-      body:  isLoading
-          ? buildSkeletonLoader()  // Changed from CircularProgressIndicator to shimmer
-          : RefreshIndicator(
-        onRefresh: _refreshShipments,
-        child: shipments.isEmpty
-            ?  Center(child: Text("noShipmentsFound".tr()))
-            : ListView.builder(
-          itemCount: shipments.length,
-          itemBuilder: (context, index) {
-            final shipment = shipments[index];
-            final shipmentIdStr = shipment['shipment_id'].toString();
-            final bilty = biltyMap[shipmentIdStr];
-            final state = biltyStates[shipmentIdStr] ?? PdfState.notDownloaded;
+      body:  SafeArea(
+        child: isLoading
+            ? buildSkeletonLoader()
+            : RefreshIndicator(
+          onRefresh: _refreshShipments,
+          child: shipments.isEmpty
+              ?  Center(child: Text("noShipmentsFound".tr()))
+              : ListView.builder(
+            itemCount: shipments.length,
+            itemBuilder: (context, index) {
+              final shipment = shipments[index];
+              final shipmentIdStr = shipment['shipment_id'].toString();
+              final bilty = biltyMap[shipmentIdStr];
+              final state = biltyStates[shipmentIdStr] ?? PdfState.notDownloaded;
 
-            return Card(
-              margin: const EdgeInsets.all(8),
-              child: ListTile(
-                title: Text(
-                  "Shipment $shipmentIdStr",
-                  style: Theme.of(context).textTheme.headlineMedium,
+              return Card(
+                margin: const EdgeInsets.all(8),
+                child: ListTile(
+                  title: Text(
+                    "Shipment $shipmentIdStr",
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.location_on, color: AppColors.teal, size: 20),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${trimAddress(shipment['pickup'] ?? '')}',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.flag, color: Colors.red, size: 20),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${trimAddress(shipment['drop'] ?? '')}',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Delivery: ${shipment['delivery_date'] ?? 'N/A'}",
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      bilty == null
+                          ? ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BiltyFormPage(shipmentId: shipmentIdStr),
+                            ),
+                          ).then((_) async {
+                            final bilty = await Supabase.instance.client
+                                .from('bilties')
+                                .select()
+                                .eq('shipment_id', shipmentIdStr)
+                                .maybeSingle();
+
+                            if (bilty != null) {
+                              biltyMap[shipmentIdStr] = Map<String, dynamic>.from(bilty);
+
+                              final appDir = await getApplicationDocumentsDirectory();
+                              final localPath = '${appDir.path}/$shipmentIdStr.pdf';
+                              final file = File(localPath);
+                              biltyStates[shipmentIdStr] =
+                              await file.exists() ? PdfState.downloaded : PdfState.notDownloaded;
+                            }
+
+                            setState(() {});
+                          });
+                        },
+                        child:  Text("generateBilty".tr()),
+                      )
+                          : Row(
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: state == PdfState.downloaded ? Colors.grey : null,
+                            ),
+                            onPressed: state == PdfState.downloaded ? null : () => _downloadBilty(bilty),
+                            child: Text(state == PdfState.downloaded ? "downloaded".tr() : "downloadBilty".tr()),
+                          ),
+                          const SizedBox(width: 6),
+                          IconButton(
+                            icon: const Icon(Icons.remove_red_eye),
+                            onPressed: () => _previewBilty(shipmentIdStr),
+                          ),
+                          IconButton(
+                            onPressed: state == PdfState.downloaded ? () => _shareBilty(bilty) : null,
+                            icon: const Icon(Icons.share),
+                          ),
+                          IconButton(
+                            onPressed: state == PdfState.downloaded ? () => _deleteBilty(bilty) : null,
+                            icon: const Icon(Icons.delete),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.location_on, color: AppColors.teal, size: 20),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '${trimAddress(shipment['pickup'] ?? '')}',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.flag, color: Colors.red, size: 20),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '${trimAddress(shipment['drop'] ?? '')}',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Delivery: ${shipment['delivery_date'] ?? 'N/A'}",
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    bilty == null
-                        ? ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => BiltyFormPage(shipmentId: shipmentIdStr),
-                          ),
-                        ).then((_) async {
-                          // Refresh single shipment bilty from Supabase
-                          final bilty = await Supabase.instance.client
-                              .from('bilties')
-                              .select()
-                              .eq('shipment_id', shipmentIdStr)
-                              .maybeSingle();
-
-                          if (bilty != null) {
-                            biltyMap[shipmentIdStr] = Map<String, dynamic>.from(bilty);
-
-                            final appDir = await getApplicationDocumentsDirectory();
-                            final localPath = '${appDir.path}/$shipmentIdStr.pdf';
-                            final file = File(localPath);
-                            biltyStates[shipmentIdStr] =
-                            await file.exists() ? PdfState.downloaded : PdfState.notDownloaded;
-                          }
-
-                          setState(() {});
-                        });
-                      },
-                      child:  Text("generateBilty".tr()),
-                    )
-                        : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: state == PdfState.downloaded ? Colors.grey : null,
-                          ),
-                          onPressed: state == PdfState.downloaded ? null : () => _downloadBilty(bilty),
-                          child: Text(state == PdfState.downloaded ? "downloaded".tr() : "downloadBilty".tr()),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.remove_red_eye),
-                          onPressed: () => _previewBilty(shipmentIdStr),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: state == PdfState.downloaded ? () => _shareBilty(bilty) : null,
-                          icon: const Icon(Icons.share),
-                        ),
-                        const SizedBox(width:5),
-                        IconButton(
-                          onPressed: state == PdfState.downloaded ? () => _deleteBilty(bilty) : null,
-                          icon: const Icon(Icons.delete),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
