@@ -145,7 +145,20 @@ class _AgentChatListPageState extends State<AgentChatListPage> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
+                    return Center(
+                      child: RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'Check Internet conection\n',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            TextSpan(text: '${snapshot.error}'),
+                          ],
+                        ),
+                      ),
+                    );
                   }
                   if (!snapshot.hasData) {
                     return Center(child: Text('no_data_found'.tr()));
