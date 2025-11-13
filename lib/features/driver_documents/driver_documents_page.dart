@@ -99,6 +99,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
         _userRole = UserRole.driver;
       }
     } catch (_) {
+      // Fallback: if detection fails, default to driver
       if (_loggedInUserId?.startsWith('TRUK') == true) {
         _userRole = UserRole.truckOwner;
       } else {
@@ -166,8 +167,18 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
             return bTime.compareTo(aTime);
           });
           final doc = matched.isNotEmpty ? matched.first : {};
+          // Normalize status to readable values:
+          String status = 'Not Uploaded';
+          if (doc.isNotEmpty) {
+            final raw = (doc['status'] ?? '').toString().trim();
+            if (raw.isEmpty || raw.toLowerCase() == 'null') {
+              status = 'Not Uploaded';
+            } else {
+              status = raw; // keep whatever stored (pending/approved/rejected etc.)
+            }
+          }
           docStatus[docType] = {
-            'status': doc.isEmpty ? 'Not Uploaded' : (doc['status'] ?? 'pending'),
+            'status': status,
             'file_url': doc['file_url'],
             'rejection_reason': doc['rejection_reason'],
           };
@@ -181,30 +192,79 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
 
       setState(() {
         _drivers = driversWithStatus;
-        _applyStatusFilter();
-        _isLoading = false;
       });
+
+      // Apply filter after loaded
+      _applyStatusFilter();
     } catch (e) {
       _showErrorSnackBar(e.toString());
+    } finally {
       setState(() => _isLoading = false);
     }
   }
 
+  /// APPLIES FILTER for agent/truckOwner list view
   void _applyStatusFilter() {
+    // Show all drivers
     if (_selectedStatusFilter == 'All') {
       _filteredDrivers = List.from(_drivers);
-    } else {
-      final filter = _selectedStatusFilter.toLowerCase();
-      _filteredDrivers = _drivers.where((driver) {
-        final docs = driver['documents'] as Map<String, Map<String, dynamic>>;
-        return docs.values.any(
-              (doc) => (doc['status'] ?? '').toString().toLowerCase() == filter,
-        );
-      }).toList();
+      setState(() {});
+      return;
     }
+
+    final filter = _selectedStatusFilter.toLowerCase().trim();
+
+    _filteredDrivers = _drivers.where((driver) {
+      final docs = driver['documents'] as Map<String, Map<String, dynamic>>;
+
+      return docs.values.any((doc) {
+        final docStatus = (doc['status'] ?? '').toString().toLowerCase().trim();
+
+        // For "Not Uploaded" stored as 'Not Uploaded' (human label), handle specially
+        if (filter == 'not uploaded') {
+          return docStatus == 'not uploaded' || docStatus.isEmpty || docStatus == 'null';
+        }
+
+        // Option A: Pending only -> docStatus must equal 'pending'
+        return docStatus == filter;
+      });
+    }).toList();
+
+    setState(() {});
+  }
+
+  /// Returns filtered map of driver's personal documents for driver-screen
+  Map<String, Map<String, dynamic>> _driverPersonalDocsFilteredForDriverView() {
+    final driverDocs = _drivers.isNotEmpty
+        ? _drivers.first['documents'] as Map<String, Map<String, dynamic>>
+        : <String, Map<String, dynamic>>{};
+
+    if (_selectedStatusFilter == 'All') {
+      return driverDocs;
+    }
+
+    final filter = _selectedStatusFilter.toLowerCase().trim();
+
+    // Keep only matching docs (Option A: Pending shows only status == 'pending')
+    final Map<String, Map<String, dynamic>> result = {};
+    driverDocs.forEach((k, v) {
+      final docStatus = (v['status'] ?? '').toString().toLowerCase().trim();
+      if (filter == 'not uploaded') {
+        if (docStatus == 'not uploaded' || docStatus.isEmpty || docStatus == 'null') {
+          result[k] = v;
+        }
+      } else {
+        if (docStatus == filter) {
+          result[k] = v;
+        }
+      }
+    });
+
+    return result;
   }
 
   Future<void> _uploadDocument(String driverId, String docType) async {
+    // allow driver to upload only their own doc
     if (_userRole == UserRole.driver && driverId != _loggedInUserId) {
       _showErrorSnackBar('Drivers can only upload their own documents');
       return;
@@ -224,30 +284,34 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
           '${driverId}_${docType.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.$ext';
       final filePath = 'driver_documents/$fileName';
 
+      // upload to bucket
       await supabase.storage.from('driver-documents').upload(filePath, file);
-      final url = supabase.storage.from('driver-documents').getPublicUrl(filePath);
+      final publicUrl = supabase.storage.from('driver-documents').getPublicUrl(filePath);
 
+      // upsert row in driver_documents (set status to pending)
       await supabase.from('driver_documents').upsert({
         'driver_custom_id': driverId,
         'document_type': docType,
-        'file_url': url,
+        'file_url': publicUrl,
         'file_path': filePath,
         'status': 'pending',
         'submitted_at': DateTime.now().toIso8601String(),
-        'uploaded_by_role': _userRole.toString(),
+        'uploaded_by_role': _userRole == UserRole.agent ? 'agent' : 'driver',
         'document_category': 'personal',
         'user_id': supabase.auth.currentUser?.id,
       });
 
-      _showSuccessSnackBar('Uploaded successfully');
+      _showSuccessSnackBar('Document uploaded successfully');
       await _loadDriverDocuments();
     } catch (e) {
-      _showErrorSnackBar(e.toString());
+      _showErrorSnackBar('Error uploading document: ${e.toString()}');
     } finally {
       setState(() {
         _uploadingDriverId = null;
         _uploadingDocType = null;
       });
+      // re-evaluate filters immediately after upload
+      _applyStatusFilter();
     }
   }
 
@@ -259,18 +323,32 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     try {
       final docs = await supabase
           .from('driver_documents')
-          .select('id')
+          .select('id, status, updated_at')
           .eq('driver_custom_id', driverId)
           .eq('document_type', docType);
-      if (docs.isEmpty) return;
+
+      if (docs.isEmpty) {
+        _showErrorSnackBar('no_document_found_to_approve'.tr());
+        return;
+      }
+
+      // choose most recent by updated_at (safer)
+      docs.sort((a, b) {
+        final aT = DateTime.tryParse(a['updated_at'] ?? '') ?? DateTime(1970);
+        final bT = DateTime.tryParse(b['updated_at'] ?? '') ?? DateTime(1970);
+        return bT.compareTo(aT);
+      });
+
       final docId = docs.first['id'];
       await supabase.rpc('approve_driver_document', params: {
         'p_document_id': docId,
         'p_reviewed_by': supabase.auth.currentUser?.id,
         'p_reviewed_at': DateTime.now().toIso8601String(),
       });
+
       _showSuccessSnackBar('Document approved');
       await _loadDriverDocuments();
+      _applyStatusFilter();
     } catch (e) {
       _showErrorSnackBar(e.toString());
     }
@@ -281,24 +359,51 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       _showErrorSnackBar('drivers_cannot_reject_documents'.tr());
       return;
     }
+
     final reason = await _showRejectDialog();
     if (reason == null || reason.isEmpty) return;
+
     try {
       final docs = await supabase
           .from('driver_documents')
-          .select('id')
+          .select('id, file_path')
           .eq('driver_custom_id', driverId)
           .eq('document_type', docType);
-      if (docs.isEmpty) return;
-      final docId = docs.first['id'];
+
+      if (docs.isEmpty) {
+        _showErrorSnackBar('no_document_found_to_reject'.tr());
+        return;
+      }
+
+      docs.sort((a, b) {
+        final aT = DateTime.tryParse(a['updated_at'] ?? '') ?? DateTime(1970);
+        final bT = DateTime.tryParse(b['updated_at'] ?? '') ?? DateTime(1970);
+        return bT.compareTo(aT);
+      });
+
+      final doc = docs.first;
+      final docId = doc['id'];
+      final filePath = doc['file_path'] as String?;
+
+      // attempt remove file from storage (best-effort)
+      if (filePath != null && filePath.isNotEmpty) {
+        try {
+          await supabase.storage.from('driver-documents').remove([filePath]);
+        } catch (_) {
+          // continue even if removal fails
+        }
+      }
+
       await supabase.rpc('reject_driver_document', params: {
         'p_document_id': docId,
         'p_reviewed_by': supabase.auth.currentUser?.id,
         'p_rejection_reason': reason,
         'p_reviewed_at': DateTime.now().toIso8601String(),
       });
+
       _showSuccessSnackBar('Document rejected');
       await _loadDriverDocuments();
+      _applyStatusFilter();
     } catch (e) {
       _showErrorSnackBar(e.toString());
     }
@@ -316,25 +421,24 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
             hintText: 'enter_rejection_reason'.tr(),
             border: const OutlineInputBorder(),
           ),
+          maxLines: 3,
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: Text('cancel'.tr())),
-          ElevatedButton(
-              onPressed: () => Navigator.pop(context, reason),
-              child: Text('reject'.tr())),
+          ElevatedButton(onPressed: () => Navigator.pop(context, reason), child: Text('reject'.tr())),
         ],
       ),
     );
   }
 
   void _showErrorSnackBar(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
   void _showSuccessSnackBar(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
   }
 
   @override
@@ -355,8 +459,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Chip(
-                label: Text(roleText,
-                    style: const TextStyle(color: Colors.white, fontSize: 12)),
+                label: Text(roleText, style: const TextStyle(color: Colors.white, fontSize: 12)),
                 backgroundColor: AppColors.teal.withOpacity(0.8),
               ),
             ),
@@ -365,7 +468,50 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _userRole == UserRole.driver
-          ? _buildDriverUploadInterface()
+          ? Column(
+        children: [
+          // driver filter bar (works as requested: Pending => only 'pending')
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Text('filter'.tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _statusFilters.map((status) {
+                        final isSelected = _selectedStatusFilter == status;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(status),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedStatusFilter = status;
+                                // No need to re-fetch from DB; we already have docs loaded
+                              });
+                            },
+                            backgroundColor: isSelected ? AppColors.teal : null,
+                            selectedColor: AppColors.teal,
+                            labelStyle: TextStyle(color: isSelected ? Colors.white : null),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // driver documents - filtered according to selected status
+          Expanded(
+            child: _buildDriverUploadInterfaceFiltered(),
+          ),
+        ],
+      )
           : _buildAllDriversList(),
     );
   }
@@ -396,8 +542,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
                         },
                         backgroundColor: selected ? AppColors.teal : null,
                         selectedColor: AppColors.teal,
-                        labelStyle:
-                        TextStyle(color: selected ? Colors.white : Colors.black),
+                        labelStyle: TextStyle(color: selected ? Colors.white : Colors.black),
                       ),
                     );
                   }).toList(),
@@ -429,8 +574,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       child: ExpansionTile(
         leading: CircleAvatar(
           backgroundColor: AppColors.teal,
-          child: Text(driverName[0].toUpperCase(),
-              style: const TextStyle(color: Colors.white)),
+          child: Text(driverName[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
         ),
         title: Text(driverName, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(driverId),
@@ -451,11 +595,11 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     );
   }
 
-  Widget _buildDocumentTile(String driverId, String docType,
-      Map<String, dynamic> docConfig, Map<String, dynamic> docStatus) {
-    final status = docStatus['status'] ?? 'Not Uploaded';
-    final fileUrl = docStatus['file_url'];
-    final rejectionReason = docStatus['rejection_reason'];
+  Widget _buildDocumentTile(String driverId, String docType, Map<String, dynamic> docConfig,
+      Map<String, dynamic> docStatus) {
+    final status = (docStatus['status'] ?? 'Not Uploaded').toString();
+    final fileUrl = docStatus['file_url'] as String?;
+    final rejectionReason = docStatus['rejection_reason'] as String?;
     final uploading = _uploadingDriverId == driverId && _uploadingDocType == docType;
     bool canUpload = false;
 
@@ -466,7 +610,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     }
 
     Color color;
-    switch (status.toString().toLowerCase()) {
+    switch (status.toLowerCase()) {
       case 'approved':
         color = Colors.green;
         break;
@@ -483,54 +627,41 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
       child: Row(children: [
         Icon(docConfig['icon'], color: docConfig['color']),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(docType, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(docConfig['description'],
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      border: Border.all(color: color),
-                      borderRadius: BorderRadius.circular(12)),
-                  child: Text(status,
-                      style: TextStyle(
-                          color: color, fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-                if (rejectionReason != null && rejectionReason.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text('Reason: $rejectionReason',
-                        style: const TextStyle(color: Colors.red, fontSize: 11)),
-                  )
-              ]),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(docType, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(docConfig['description'], style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), border: Border.all(color: color), borderRadius: BorderRadius.circular(12)),
+              child: Text(status, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+            ),
+            if (rejectionReason != null && rejectionReason.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('Reason: $rejectionReason', style: const TextStyle(color: Colors.red, fontSize: 11)),
+              )
+          ]),
         ),
         const SizedBox(width: 8),
         if (uploading)
-          const SizedBox(
-              width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
         else
           _buildActionButtons(driverId, docType, status, fileUrl, canUpload),
       ]),
     );
   }
 
-  Widget _buildActionButtons(String driverId, String docType, String status,
-      String? fileUrl, bool canUpload) {
-    final statusLower = status.toString().toLowerCase();
+  Widget _buildActionButtons(String driverId, String docType, String status, String? fileUrl, bool canUpload) {
+    final statusLower = (status ?? '').toString().toLowerCase();
     final buttons = <Widget>[];
 
-    if ((statusLower == 'not uploaded' || statusLower == 'rejected') && canUpload) {
+    if ((statusLower == 'not uploaded' || statusLower == 'rejected' || statusLower == '') && canUpload) {
       buttons.add(ElevatedButton(
         onPressed: () => _uploadDocument(driverId, docType),
         style: ElevatedButton.styleFrom(
@@ -538,95 +669,121 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         ),
-        child: Text(statusLower == 'rejected' ? 'Re-upload' : 'Upload',
-            style: const TextStyle(fontSize: 10)),
+        child: Text(statusLower == 'rejected' ? 'Re-upload' : 'Upload', style: const TextStyle(fontSize: 10)),
       ));
     }
 
-    if (status != 'Not Uploaded' && fileUrl != null) {
+    if (statusLower != 'not uploaded' && fileUrl != null) {
       buttons.add(IconButton(
         icon: Icon(Icons.visibility_outlined, color: AppColors.teal, size: 18),
         onPressed: () async {
-          final uri = Uri.parse(fileUrl);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          try {
+            final uri = Uri.parse(fileUrl);
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            } else {
+              _showErrorSnackBar('Cannot open document');
+            }
+          } catch (e) {
+            _showErrorSnackBar('Cannot open document');
           }
         },
       ));
     }
 
-    if (statusLower == 'pending' &&
-        (_userRole == UserRole.agent || _userRole == UserRole.truckOwner)) {
+    if (statusLower == 'pending' && (_userRole == UserRole.agent || _userRole == UserRole.truckOwner)) {
       buttons.addAll([
-        IconButton(
-          icon: const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
-          onPressed: () => _approveDocument(driverId, docType),
-        ),
-        IconButton(
-          icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 18),
-          onPressed: () => _rejectDocument(driverId, docType),
-        ),
+        IconButton(icon: const Icon(Icons.check_circle_outline, color: Colors.green, size: 18), onPressed: () => _approveDocument(driverId, docType)),
+        IconButton(icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 18), onPressed: () => _rejectDocument(driverId, docType)),
       ]);
     }
 
     return Wrap(spacing: 4, children: buttons);
   }
 
-  Widget _buildDriverUploadInterface() {
-    final driverDocs = _drivers.isNotEmpty
-        ? _drivers.first['documents'] as Map<String, Map<String, dynamic>>
-        : <String, Map<String, dynamic>>{};
+  // DRIVER-SIDE: build UI filtered by _selectedStatusFilter (Option A: pending shows only pending)
+  Widget _buildDriverUploadInterfaceFiltered() {
+    final filteredDocs = _driverPersonalDocsFilteredForDriverView();
+
+    // If filter is All, show all cards in preset order
+    if (_selectedStatusFilter == 'All') {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: _personalDocuments.entries.map((entry) {
+            final docType = entry.key;
+            final docData = filteredDocs[docType] ?? {'status': 'Not Uploaded'};
+            return _buildDriverCardDocument(docType, entry.value, docData);
+          }).toList(),
+        ),
+      );
+    }
+
+    // If not All, show only matching docs. If none, show message.
+    if (filteredDocs.isEmpty) {
+      return Center(child: Text('no_documents_matching_filter'.tr()));
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: _personalDocuments.entries.map((entry) {
-          final docType = entry.key;
-          final docData = driverDocs[docType] ?? {'status': 'Not Uploaded'};
-          final status = docData['status'] ?? 'Not Uploaded';
-          final rejectionReason = docData['rejection_reason'] as String?;
-          final statusLower = status.toString().toLowerCase();
-
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Icon(entry.value['icon'], color: AppColors.teal, size: 24),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(docType,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                      _buildStatusChip(status),
-                    ]),
-                    const SizedBox(height: 10),
-                    if (rejectionReason != null && rejectionReason.isNotEmpty)
-                      Text('Reason: $rejectionReason',
-                          style: const TextStyle(color: Colors.red, fontSize: 12)),
-                    const SizedBox(height: 10),
-                    if (statusLower == 'not uploaded' ||
-                        statusLower == 'rejected')
-                      ElevatedButton.icon(
-                        onPressed: () => _uploadDocument(_loggedInUserId!, docType),
-                        icon: const Icon(Icons.upload_file, size: 16),
-                        label: Text(statusLower == 'rejected'
-                            ? 'Re-upload'
-                            : 'Upload'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.teal,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                  ]),
-            ),
-          );
+        children: filteredDocs.entries.map((e) {
+          final docType = e.key;
+          final docData = e.value;
+          final config = _personalDocuments[docType] ?? {'icon': Icons.description, 'description': ''};
+          return _buildDriverCardDocument(docType, config, docData);
         }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildDriverCardDocument(String docType, Map<String, dynamic> config, Map<String, dynamic> docData) {
+    final status = (docData['status'] ?? 'Not Uploaded').toString();
+    final rejectionReason = docData['rejection_reason'] as String?;
+    final isUploading = _uploadingDriverId == _loggedInUserId && _uploadingDocType == docType;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(config['icon'], size: 24, color: AppColors.teal),
+            const SizedBox(width: 12),
+            Expanded(child: Text(docType, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+            _buildStatusChip(status),
+          ]),
+          const SizedBox(height: 12),
+          if (rejectionReason != null && rejectionReason.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.red.shade200)),
+              child: Row(children: [
+                Icon(Icons.error_outline, color: Colors.red.shade600, size: 16),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Rejection Reason: $rejectionReason', style: TextStyle(color: Colors.red.shade700, fontSize: 12))),
+              ]),
+            ),
+          if (rejectionReason != null && rejectionReason.isNotEmpty) const SizedBox(height: 12),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text('Status: $status', style: const TextStyle(fontSize: 14, color: Colors.grey)),
+            if (isUploading)
+              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+            else if (status.toLowerCase() == 'not uploaded' || status.toLowerCase() == 'rejected')
+              ElevatedButton.icon(
+                onPressed: () => _uploadDocument(_loggedInUserId!, docType),
+                icon: const Icon(Icons.upload_file, size: 16),
+                label: Text(status.toLowerCase() == 'rejected' ? 'Re-upload' : 'Upload'),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white),
+              )
+            else if (status.toLowerCase() == 'pending')
+                Text('under_review'.tr(), style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold))
+              else if (status.toLowerCase() == 'approved')
+                  Row(children: const [Icon(Icons.check_circle, color: Colors.green, size: 16), SizedBox(width: 4), Text('Approved', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))]),
+          ])
+        ]),
       ),
     );
   }
@@ -650,12 +807,6 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
         bg = Colors.grey.shade100;
         text = Colors.grey.shade800;
     }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration:
-      BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-      child: Text(status,
-          style: TextStyle(color: text, fontWeight: FontWeight.bold, fontSize: 12)),
-    );
+    return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)), child: Text(status, style: TextStyle(color: text, fontWeight: FontWeight.bold, fontSize: 12)));
   }
 }
