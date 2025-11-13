@@ -32,19 +32,13 @@ class MytripsServices {
         column = 'shipper_id';
         break;
       case 'truckowner':
-        column = 'assigned_truckowner';
-        break;
-      case 'driver_individual':
-        column = 'assigned_driver';
-        break;
-      case 'driver':
-        column = 'assigned_driver';
-        break;
-      case 'driver_company':
-        column = 'assigned_driver';
+        column = 'assigned_agent';
         break;
       case 'agent':
         column = 'assigned_agent';
+        break;
+      case 'driver':
+        column = 'assigned_driver';
         break;
       default:
         return [];

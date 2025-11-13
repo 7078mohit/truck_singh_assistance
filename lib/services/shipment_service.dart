@@ -28,10 +28,9 @@ class ShipmentService {
         throw Exception("Could not find company ID for the current user.");
       }
 
-      final updateField = companyId.startsWith('TRUK') ? 'assigned_truckowner' : 'assigned_agent';
       await _supabase.from('shipment').update({
         'booking_status': 'Accepted',
-        updateField: companyId,
+        'assigned_agent': companyId,
       }).eq('shipment_id', shipmentId);
     } catch (e) {
       print("Error accepting marketplace shipment: $e");
@@ -47,12 +46,10 @@ class ShipmentService {
         throw Exception("User not logged in or has no custom ID");
       }
 
-      final updateField = customUserId.startsWith('TRUK') ? 'assigned_truckowner' : 'assigned_agent';
-
       final shipmentsRes = await _supabase
           .from('shipment')
           .select('*, shipper:user_profiles!fk_shipper_custom_id(name)')
-          .eq(updateField, customUserId);
+          .eq('assigned_agent', customUserId);
 
       return List<Map<String, dynamic>>.from(shipmentsRes);
     } catch (e) {
