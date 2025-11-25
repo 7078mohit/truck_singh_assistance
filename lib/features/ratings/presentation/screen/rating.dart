@@ -17,7 +17,8 @@ class _RatingState extends State<Rating> {
   String? currentUserRole;
   String? person1Name;
   String? person1Id;
-  String? person1Role;double rating1 = 0;
+  String? person1Role;
+  double rating1 = 0;
   TextEditingController feedback1 = TextEditingController();
   String? person2Name;
   String? person2Id;
@@ -25,6 +26,7 @@ class _RatingState extends State<Rating> {
   double rating2 = 0;
   TextEditingController feedback2 = TextEditingController();
   bool isLoading = true;
+  bool canRate = true;
   final _client = Supabase.instance.client;
 
   //Submit rating part below
@@ -317,12 +319,10 @@ class _RatingState extends State<Rating> {
 
   Future<void> fetchExistingRating() async {
     try {
-      final supabase = Supabase.instance.client;
-
-      final currentUserId = supabase.auth.currentUser?.id;
+      final currentUserId = _client.auth.currentUser?.id;
       if (currentUserId == null) return;
 
-      final profile = await supabase
+      final profile = await _client
           .from('user_profiles')
           .select('custom_user_id')
           .eq('user_id', currentUserId)
@@ -331,9 +331,22 @@ class _RatingState extends State<Rating> {
       if (profile == null) return;
       final currentUserCustomId = profile['custom_user_id'];
 
-      final existingRatings = await supabase
+      final shipmentResponse = await _client
+          .from('shipment')
+          .select('assigned_driver, assigned_agent, shipper_id, delivery_date')
+          .eq('shipment_id', widget.shipmentId)
+          .maybeSingle();
+
+      final deliveryDate = DateTime.tryParse(
+        shipmentResponse?['delivery_date'] ?? '',
+      );
+
+      canRate = deliveryDate != null &&
+          !DateTime.now().isAfter(deliveryDate.add(const Duration(days: 7)));
+
+      final existingRatings = await _client
           .from('ratings')
-          .select('ratee_id,rating,feedback')
+          .select('ratee_id,rating,feedback,edit_count')
           .eq('shipment_id', widget.shipmentId)
           .eq('rater_id', currentUserCustomId);
 
@@ -344,6 +357,9 @@ class _RatingState extends State<Rating> {
         } else if (r['ratee_id'] == person2Id) {
           rating2 = (r['rating'] as num?)?.toDouble() ?? 0;
           feedback2.text = r['feedback'] ?? '';
+        }
+        if(r['edit_count'] > 3) {
+          canRate = false;
         }
       }
       setState(() {});
@@ -534,7 +550,17 @@ class _RatingState extends State<Rating> {
             ],
             Center(
               child: ElevatedButton.icon(
-                onPressed: _handleSubmitRating,
+                onPressed: canRate ?
+                _handleSubmitRating
+                    : () {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('${tr("rating_expired")}')));
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: canRate ? Colors.orange : Colors.grey,
+                  foregroundColor: canRate ? Colors.white : Colors.white70,
+                ),
                 icon: const Icon(Icons.send),
                 label: Text(tr("submit_ratings")),
               ),

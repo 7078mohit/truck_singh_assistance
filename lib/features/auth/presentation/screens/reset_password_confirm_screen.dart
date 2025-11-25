@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../../utils/password_validator.dart';
 import '../../utils/auth_exception_handler.dart';
-import 'package:easy_localization/easy_localization.dart';
+
 class ResetPasswordPageDeepLink extends StatefulWidget {
   final Uri? uri;
-  const ResetPasswordPageDeepLink({this.uri, super.key});
+  const ResetPasswordPageDeepLink({super.key, this.uri});
 
   @override
   State<ResetPasswordPageDeepLink> createState() =>
@@ -16,85 +17,27 @@ class _ResetPasswordPageDeepLinkState extends State<ResetPasswordPageDeepLink> {
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
   bool _loading = false;
-  bool _obscurePassword = true;
+  bool _obscure = true;
 
-  /// Updates the user's password with the new value.
-  Future<void> _updatePassword() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() => _loading = true);
-
-    try {
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(password: _passwordCtrl.text.trim()),
-      );
-      if (mounted) {
-        _showSuccessDialog();
-      }
-    } on AuthException catch (e) {
-      if (mounted) {
-        // MODIFIED: Use the AuthExceptionHandler for better messages.
-        _showErrorDialog(AuthExceptionHandler.getErrorMessage(e));
-      }
-    } catch (_) {
-      if (mounted) {
-        _showErrorDialog("unexpected_error".tr());
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    }
+  @override
+  void dispose() {
+    _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
+    super.dispose();
   }
 
-  /// Shows a success dialog and navigates to the login page.
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false, // User must tap button to close
-      builder: (context) => AlertDialog(
-        title:  Text("success".tr()),
-        content:  Text("password_updated".tr()),
-        actions: [
-          TextButton(
-            child:  Text("go_to_login".tr()),
-            onPressed: () {
-              Navigator.of(context)
-                  .pushNamedAndRemoveUntil('/login', (route) => false);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Shows an error dialog with a specific message.
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title:  Text("error".tr()),
-        content: Text(message),
-        actions: [
-          TextButton(
-            child:  Text("ok".tr()),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String label, {Widget? suffixIcon}) {
+  InputDecoration _inputDecoration(String label, {Widget? suffix}) {
     return InputDecoration(
+      labelText: label,
       filled: true,
       fillColor: Colors.grey.shade100,
-      labelText: label,
-      prefixIcon: Icon(Icons.lock_outline, color: Theme.of(context).primaryColorDark),
-      suffixIcon: suffixIcon,
+      prefixIcon: Icon(
+        Icons.lock_outline,
+        color: Theme.of(context).primaryColorDark,
+      ),
+      suffixIcon: suffix,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -106,24 +49,69 @@ class _ResetPasswordPageDeepLinkState extends State<ResetPasswordPageDeepLink> {
     );
   }
 
-  @override
-  void dispose() {
-    _passwordCtrl.dispose();
-    _confirmPasswordCtrl.dispose();
-    super.dispose();
+  void _showDialog(String title, String message, {bool goLogin = false}) {
+    showDialog(
+      barrierDismissible: !goLogin,
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title.tr()),
+        content: Text(message.tr()),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              if (goLogin) {
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                      (_) => false,
+                );
+              }
+            },
+            child: Text(goLogin ? "go_to_login".tr() : "ok".tr()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updatePassword() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _loading = true);
+
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(password: _passwordCtrl.text.trim()),
+      );
+
+      if (mounted) {
+        _showDialog("success", "password_updated", goLogin: true);
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        _showDialog("error", AuthExceptionHandler.getErrorMessage(e));
+      }
+    } catch (_) {
+      if (mounted) {
+        _showDialog("error", "unexpected_error");
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title:  Text("set_new_password".tr()),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
-      ),
       extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: Text("set_new_password".tr()),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
       body: Container(
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -134,92 +122,88 @@ class _ResetPasswordPageDeepLinkState extends State<ResetPasswordPageDeepLink> {
             end: Alignment.bottomRight,
           ),
         ),
-        alignment: Alignment.center,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Material(
             elevation: 8,
             borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.all(28.0),
-              decoration: BoxDecoration(
-                //color: Colors.white,
-                color: Theme.of(context).cardColor,
-
-                borderRadius: BorderRadius.circular(20),
-              ),
+            color: Theme.of(context).cardColor,
+            child: Padding(
+              padding: const EdgeInsets.all(28),
               child: Form(
                 key: _formKey,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.lock_person, size: 60, color: Colors.deepPurple),
+                    const Icon(
+                      Icons.lock_person,
+                      size: 60,
+                      color: Colors.deepPurple,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       "create_new_password".tr(),
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 24),
                     TextFormField(
                       controller: _passwordCtrl,
-                      obscureText: _obscurePassword,
+                      obscureText: _obscure,
+                      enabled: !_loading,
                       decoration: _inputDecoration(
                         "new_password".tr(),
-                        suffixIcon: IconButton(
+                        suffix: IconButton(
                           icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility
-                                : Icons.visibility_off,
+                            _obscure ? Icons.visibility : Icons.visibility_off,
                             color: Colors.grey.shade600,
                           ),
-                          onPressed: () =>
-                              setState(() => _obscurePassword = !_obscurePassword),
+                          onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
-                      enabled: !_loading,
-                      // MODIFIED: Use the dedicated password validator.
                       validator: PasswordValidator.validatePassword,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _confirmPasswordCtrl,
-                      obscureText: _obscurePassword,
-                      decoration: _inputDecoration("confirm_new_password".tr()),
+                      obscureText: _obscure,
                       enabled: !_loading,
-                      validator: (val) {
-                        if (val != _passwordCtrl.text) {
-                          return 'passwords_do_not_match'.tr();
-                        }
-                        return null;
-                      },
+                      decoration: _inputDecoration("confirm_new_password".tr()),
+                      validator: (value) => value == _passwordCtrl.text
+                          ? null
+                          : "passwords_do_not_match".tr(),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                     ),
+
                     const SizedBox(height: 24),
+
+                    // BUTTON
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton(
+                        onPressed: _loading ? null : _updatePassword,
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: _loading ? null : _updatePassword,
                         child: _loading
                             ? const SizedBox(
                           height: 24,
                           width: 24,
                           child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 3),
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
                         )
-                            :  Text(
-                          'update_password'.tr(),
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w600),
+                            : Text(
+                          "update_password".tr(),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),

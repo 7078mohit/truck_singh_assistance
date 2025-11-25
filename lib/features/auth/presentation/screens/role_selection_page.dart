@@ -9,7 +9,7 @@ import 'profile_setup_page.dart';
 class RoleSelectionPage extends StatelessWidget {
   const RoleSelectionPage({super.key});
 
-  final List<UserRole> _availableRoles = const [
+  final List<UserRole> _roles = const [
     UserRole.agent,
     UserRole.driver,
     UserRole.truckOwner,
@@ -18,159 +18,43 @@ class RoleSelectionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final shadow = theme.shadowColor.withOpacity(0.1);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: theme.colorScheme.background,
       appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.teal.shade800),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginPage()),
-            );
-          },
-        ),
-        title: Text(
-          'choose_your_role'.tr(),
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-          ),
-        ),
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-        foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
+        leading: BackButton(color: Colors.teal.shade800),
+        title: Text('choose_your_role'.tr()),
         elevation: 0,
-        shadowColor: Colors.transparent,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.blue.withOpacity(0.2),
-                  Colors.blue.withOpacity(0.1),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-          ),
-        ),
+        backgroundColor: theme.appBarTheme.backgroundColor,
       ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
+            colors: [
+              theme.colorScheme.background,
+              theme.colorScheme.surface,
+            ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).colorScheme.background,
-              Theme.of(context).colorScheme.surface,
-            ],
           ),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20.0,
-              vertical: 16.0,
-            ),
+            padding: const EdgeInsets.all(20),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Theme.of(context).shadowColor.withOpacity(0.1),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.blue[400]!, Colors.blue[600]!],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.person_outline,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'select_role_to_continue'.tr(),
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(
-                                  context,
-                                ).textTheme.headlineMedium?.color,
-                                height: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'determine_dashboard'.tr(),
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Colors.grey[600],
-                                height: 1.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
+                _headerCard(context, shadow),
                 const SizedBox(height: 24),
-
-                // Roles List
                 Expanded(
                   child: ListView.builder(
+                    itemCount: _roles.length,
                     physics: const BouncingScrollPhysics(),
-                    itemCount: _availableRoles.length,
-                    itemBuilder: (context, index) {
-                      final role = _availableRoles[index];
-                      return AnimatedContainer(
-                        duration: Duration(milliseconds: 100 + (index * 50)),
-                        child: _buildRoleCard(context, role, index),
-                      );
-                    },
+                    itemBuilder: (_, i) => _roleCard(context, _roles[i], i),
                   ),
                 ),
-
-                // Footer
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.security, size: 16, color: Colors.grey[500]),
-                      const SizedBox(width: 8),
-                      Text(
-                        'info_secure'.tr(),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                      ),
-                    ],
-                  ),
-                ),
+                _footerText(),
               ],
             ),
           ),
@@ -179,42 +63,68 @@ class RoleSelectionPage extends StatelessWidget {
     );
   }
 
-  Widget _buildRoleCard(BuildContext context, UserRole role, int index) {
+  Widget _headerCard(BuildContext context, Color shadow) {
+    final theme = Theme.of(context);
+
     return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: shadow, blurRadius: 20, offset: const Offset(0, 4))],
+      ),
+      child: Row(
+        children: [
+          _iconBox([Colors.blue[400]!, Colors.blue[600]!], Icons.person_outline),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'select_role_to_continue'.tr(),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'determine_dashboard'.tr(),
+                  style: theme.textTheme.labelLarge?.copyWith(color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _roleCard(BuildContext context, UserRole role, int index) {
+    final theme = Theme.of(context);
+    final shadow = theme.shadowColor.withOpacity(0.1);
+
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 150 + index * 60),
       margin: const EdgeInsets.only(bottom: 12),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => _handleRoleSelection(context, role),
           borderRadius: BorderRadius.circular(16),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+          onTap: () => _selectRole(context, role),
+          child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
+              color: theme.cardColor,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(context).shadowColor.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              boxShadow: [BoxShadow(color: shadow, blurRadius: 10, offset: const Offset(0, 2))],
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.blue[400]!.withOpacity(0.1),
-                        Colors.blue[600]!.withOpacity(0.15),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(role.icon, size: 28, color: Colors.blue[600]),
+                _iconBox(
+                  [Colors.blue[400]!.withOpacity(0.1), Colors.blue[600]!.withOpacity(0.2)],
+                  role.icon,
+                  size: 28,
                 ),
                 const SizedBox(width: 20),
                 Expanded(
@@ -222,41 +132,20 @@ class RoleSelectionPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        role == UserRole.driver
-                            ? "driver".tr()
-                            : role.displayName,
-                        style: TextStyle(
-                          fontSize: 18,
+                        role.displayName,
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: Theme.of(
-                            context,
-                          ).textTheme.headlineMedium?.color,
-                          height: 1.2,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _getRoleDescription(role),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
-                          height: 1.3,
-                        ),
+                        _roleDescription(role),
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios,
-                    color: Colors.grey[600],
-                    size: 14,
-                  ),
-                ),
+                Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey[600]),
               ],
             ),
           ),
@@ -265,39 +154,47 @@ class RoleSelectionPage extends StatelessWidget {
     );
   }
 
-  String _getRoleDescription(UserRole role) {
-    switch (role) {
-      case UserRole.agent:
-        return 'agent_desc'.tr();
-      case UserRole.driver:
-        return 'driver'.tr();
-      case UserRole.truckOwner:
-        return 'truck_owner_desc'.tr();
-      case UserRole.shipper:
-        return 'shipper_desc'.tr();
-      default:
-        return 'Select this role to continue';
-    }
+  Widget _iconBox(List<Color> colors, IconData icon, {double size = 24}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: colors),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, size: size, color: Colors.blue[600]),
+    );
   }
 
-  void _handleRoleSelection(BuildContext context, UserRole role) {
-    // Check if user is authenticated (OAuth user)
-    final currentUser = Supabase.instance.client.auth.currentUser;
+  Widget _footerText() => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.security, size: 16, color: Colors.grey[500]),
+        const SizedBox(width: 8),
+        Text('info_secure'.tr(), style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+      ],
+    ),
+  );
 
-    if (currentUser != null) {
-      // OAuth user - go directly to profile setup
-      print('✅ OAuth user detected, going to ProfileSetupPage');
-      Navigator.push(// 1. Changed this from pushReplacement
-        context,
-        MaterialPageRoute(builder: (_) => ProfileSetupPage(selectedRole: role)),
-      );
-    } else {
-      // Non-authenticated user - go to registration
-      print('⚠️ Non-authenticated user, going to RegisterPage');
-      Navigator.push(// 1. Changed this from pushReplacement
-        context,
-        MaterialPageRoute(builder: (_) => RegisterPage(selectedRole: role)),
-      );
-    }
+  String _roleDescription(UserRole role) => switch (role) {
+    UserRole.agent => 'agent_desc'.tr(),
+    UserRole.driver => 'driver'.tr(),
+    UserRole.truckOwner => 'truck_owner_desc'.tr(),
+    UserRole.shipper => 'shipper_desc'.tr(),
+    _ => "",
+  };
+
+  void _selectRole(BuildContext context, UserRole role) {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => user != null
+            ? ProfileSetupPage(selectedRole: role)
+            : RegisterPage(selectedRole: role),
+      ),
+    );
   }
 }

@@ -15,318 +15,254 @@ class UserSupportTicketsPage extends StatefulWidget {
 class _UserSupportTicketsPageState extends State<UserSupportTicketsPage> {
   late Future<List<Map<String, dynamic>>> _ticketsFuture;
   String _selectedFilter = 'All';
-  final List<String> _filters = ['All'.tr(), 'Pending'.tr(), 'In Progress'.tr(), 'Resolved'.tr()];
+
+  final _filters = ['All', 'Pending', 'In Progress', 'Resolved'];
 
   @override
   void initState() {
     super.initState();
-    _ticketsFuture = _fetchUserTickets();
-    setState(() {});
+    _ticketsFuture = _fetch();
   }
 
-  Future<List<Map<String, dynamic>>> _fetchUserTickets() async {
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return [];
+  Future<List<Map<String, dynamic>>> _fetch() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return [];
 
-      PostgrestFilterBuilder query = Supabase.instance.client
-          .from('support_tickets')
-          .select()
-          .eq('user_id', user.id);
+    var query = Supabase.instance.client
+        .from('support_tickets')
+        .select()
+        .eq('user_id', user.id);
 
-      if (_selectedFilter != 'All') {
-        query = query.eq('status', _selectedFilter);
-      }
+    if (_selectedFilter != 'All') query = query.eq('status', _selectedFilter);
 
-      final response = await query.order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      return [];
-    }
+    final res =
+    await query.order('created_at', ascending: false) as List<dynamic>;
+
+    return List<Map<String, dynamic>>.from(res);
   }
 
-  Future<void> _refresh() async {
-    setState(() {
-      _ticketsFuture = _fetchUserTickets();
-    });
-  }
+  void _refreshNow() =>
+      setState(() => _ticketsFuture = _fetch());
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title:  Text("My Support Tickets".tr()),
+        title: Text("My Support Tickets".tr()),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SupportTicketSubmissionPage(),
-                ),
-              );
-              if (result == true) {
-                _refresh();
-              }
-            },
-          ),
+              icon: const Icon(Icons.add),
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const SupportTicketSubmissionPage()),
+                );
+                if (result == true) _refreshNow();
+              })
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildFilterChips(),
-            Expanded(child: _buildTicketsList()),
-          ],
-        ),
+      body: Column(
+        children: [
+          _filterChips(),
+          Expanded(child: _ticketList()),
+        ],
       ),
     );
   }
 
-  Widget _buildFilterChips() {
-    return Container(
-      padding: const EdgeInsets.all(8.0),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: _filters.map((filter) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0),
-              child: FilterChip(
-                label: Text(filter),
-                selected: _selectedFilter == filter,
-                onSelected: (selected) {
-                  setState(() {
-                    _selectedFilter = filter;
-                    _ticketsFuture = _fetchUserTickets();
-                  });
-                },
-              ),
-            );
-          }).toList(),
+  Widget _filterChips() => SizedBox(
+    height: 50,
+    child: ListView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.all(8),
+      children: _filters
+          .map((f) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: FilterChip(
+          label: Text(f.tr()),
+          selected: _selectedFilter == f,
+          onSelected: (_) {
+            setState(() => _selectedFilter = f);
+            _refreshNow();
+          },
         ),
-      ),
-    );
-  }
+      ))
+          .toList(),
+    ),
+  );
 
-  Widget _buildTicketsList() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
+  Widget _ticketList() {
+    return FutureBuilder(
       future: _ticketsFuture,
-      builder: (context, snapshot) {
+      builder: (_, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
         if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text("Error: ${snapshot.error}"),
-                const SizedBox(height: 16),
-                ElevatedButton(onPressed: _refresh, child:  Text('Retry'.tr())),
-              ],
-            ),
-          );
+          return _error(snapshot.error.toString());
         }
 
-        final tickets = snapshot.data!;
+        final list = snapshot.data ?? [];
 
-        if (tickets.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.support_agent_outlined,
-                  size: 64,
-                  color: Colors.grey[400],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _selectedFilter == 'All'
-                      ? "No support tickets found".tr()
-                      : "No $_selectedFilter tickets found",
-                  style: const TextStyle(fontSize: 18, color: Colors.grey),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Tap the + button to create a new support request".tr(),
-                  style: TextStyle(color: Colors.grey),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                        const SupportTicketSubmissionPage(),
-                      ),
-                    );
-                    if (result == true) {
-                      _refresh();
-                    }
-                  },
-                  icon: const Icon(Icons.add),
-                  label:  Text('Create Support Request'.tr()),
-                ),
-              ],
-            ),
-          );
-        }
+        if (list.isEmpty) return _empty();
 
         return RefreshIndicator(
-          onRefresh: _refresh,
+          onRefresh: () async => _refreshNow(),
           child: ListView.builder(
-            itemCount: tickets.length,
-            itemBuilder: (context, index) {
-              final ticket = tickets[index];
-              return _buildTicketCard(ticket);
-            },
-          ),
+              itemCount: list.length,
+              itemBuilder: (_, i) => _ticketCard(list[i])),
         );
       },
     );
   }
 
-  Widget _buildTicketCard(Map<String, dynamic> ticket) {
-    final createdAt = DateTime.parse(ticket['created_at']);
-    final updatedAt = ticket['updated_at'] != null
-        ? DateTime.parse(ticket['updated_at'])
-        : createdAt;
-    final status = ticket['status'] ?? 'Pending';
-    final priority = ticket['priority'] ?? 'Medium';
+  Widget _error(String msg) => Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.error_outline, size: 64, color: Colors.red),
+        const SizedBox(height: 16),
+        Text(msg),
+        const SizedBox(height: 16),
+        ElevatedButton(onPressed: _refreshNow, child: Text("Retry".tr())),
+      ],
+    ),
+  );
+
+  Widget _empty() => Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.support_agent_outlined,
+            size: 64, color: Colors.grey[400]),
+        const SizedBox(height: 16),
+        Text("No tickets found".tr(),
+            style: const TextStyle(fontSize: 18, color: Colors.grey)),
+        const SizedBox(height: 8),
+        Text("Tap + to create a support request".tr(),
+            style: const TextStyle(color: Colors.grey)),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: () async {
+            final res = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const SupportTicketSubmissionPage()));
+            if (res == true) _refreshNow();
+          },
+          icon: const Icon(Icons.add),
+          label: Text("Create Support Request".tr()),
+        ),
+      ],
+    ),
+  );
+
+  Widget _ticketCard(Map<String, dynamic> t) {
+    final created = DateTime.parse(t['created_at']);
+    final updated = t['updated_at'] != null
+        ? DateTime.parse(t['updated_at'])
+        : created;
+
+    final status = t['status'];
+    final priority = t['priority'];
 
     return Card(
-      color: Theme.of(context).cardColor,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: InkWell(
         onTap: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  EnhancedSupportTicketDetailPage(ticket: ticket),
-            ),
-          );
-          if (result == true) {
-            _refresh();
-          }
+          final res = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => EnhancedSupportTicketDetailPage(ticket: t)));
+          if (res == true) _refreshNow();
         },
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      ticket['subject'] ?? 'No Subject'.tr(),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(status).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _getStatusColor(status)),
-                    ),
-                    child: Text(
-                      status,
-                      style: TextStyle(
-                        color: _getStatusColor(status),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
+          padding: const EdgeInsets.all(16),
+          child:
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(
+                child: Text(t['subject'] ?? "No Subject".tr(),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
               ),
-              const SizedBox(height: 8),
-              Text(
-                ticket['message'] ?? '',
-                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              _badge(status, _statusColor(status))
+            ]),
+            const SizedBox(height: 8),
+            Text(t['message'] ?? "",
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _getPriorityColor(priority),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    priority,
-                    style: TextStyle(
-                      color: _getPriorityColor(priority),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
+                style: TextStyle(color: Colors.grey[600])),
+
+            const SizedBox(height: 12),
+            Row(children: [
+              _priorityDot(priority),
+              const SizedBox(width: 8),
+              Text(priority,
+                  style: TextStyle(
+                      color: _priorityColor(priority),
+                      fontWeight: FontWeight.w500)),
+              const SizedBox(width: 16),
+              Icon(Icons.access_time, size: 14, color: Colors.grey[500]),
+              const SizedBox(width: 4),
+              Text(DateFormat('dd MMM, hh:mm a').format(created),
+                  style:
+                  TextStyle(color: Colors.grey[500], fontSize: 12)),
+              const Spacer(),
+
+              // Updated time
+              if (updated.isAfter(created))
+                Row(children: [
+                  Icon(Icons.update, size: 14, color: Colors.blue[600]),
                   const SizedBox(width: 4),
-                  Text(
-                    DateFormat('dd MMM, hh:mm a').format(createdAt),
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                  ),
-                  const Spacer(),
-                  if (updatedAt.isAfter(createdAt)) ...[
-                    Icon(Icons.update, size: 14, color: Colors.blue[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Updated ${DateFormat('dd MMM').format(updatedAt)}',
+                  Text("Updated ${DateFormat('dd MMM').format(updated)}",
                       style: TextStyle(
-                        color: Colors.blue[600],
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              if (ticket['screenshot_url'] != null) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.image, size: 14, color: Colors.green[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Has screenshot'.tr(),
-                      style: TextStyle(color: Colors.green[600], fontSize: 12),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
+                          color: Colors.blue[600],
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500)),
+                ]),
+            ]),
+
+            if (t['screenshot_url'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(children: [
+                  Icon(Icons.image, size: 14, color: Colors.green[600]),
+                  const SizedBox(width: 4),
+                  Text("Has screenshot".tr(),
+                      style:
+                      TextStyle(fontSize: 12, color: Colors.green[600])),
+                ]),
+              )
+          ]),
         ),
       ),
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
+  Widget _badge(String t, Color c) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: c.withOpacity(0.1),
+        border: Border.all(color: c)),
+    child: Text(t,
+        style: TextStyle(color: c, fontWeight: FontWeight.w500)),
+  );
+
+  Widget _priorityDot(String p) => Container(
+    width: 8,
+    height: 8,
+    decoration:
+    BoxDecoration(shape: BoxShape.circle, color: _priorityColor(p)),
+  );
+
+  Color _statusColor(String s) {
+    switch (s) {
       case 'Pending':
         return Colors.orange;
       case 'In Progress':
@@ -338,8 +274,8 @@ class _UserSupportTicketsPageState extends State<UserSupportTicketsPage> {
     }
   }
 
-  Color _getPriorityColor(String priority) {
-    switch (priority) {
+  Color _priorityColor(String p) {
+    switch (p) {
       case 'Low':
         return Colors.green;
       case 'Medium':

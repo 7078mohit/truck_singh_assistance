@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:logistics_toolkit/dashboard/admin_dashboard.dart';
-import '../../../../dashboard/agent_db_screen.dart';
-import '../../../../dashboard/company_driver_db_screen.dart';
-import '../../../../dashboard/owner_db.dart';
-import '../../../../dashboard/shipper_db_screen.dart';
-import '../../utils/user_role.dart';
 import 'package:easy_localization/easy_localization.dart';
-import '../../../../dashboard/shipper_db_screen.dart';
-import '../../../../dashboard/agent_db_screen.dart';
-
+import 'package:logistics_toolkit/dashboard/admin_dashboard.dart';
+import 'package:logistics_toolkit/dashboard/agent_db_screen.dart';
+import 'package:logistics_toolkit/dashboard/company_driver_db_screen.dart';
+import 'package:logistics_toolkit/dashboard/owner_db.dart';
+import 'package:logistics_toolkit/dashboard/shipper_db_screen.dart';
+import '../../utils/user_role.dart';
 
 class DashboardRouter extends StatelessWidget {
   final UserRole role;
@@ -39,13 +36,11 @@ class BlankPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title.isEmpty ? 'dashboard'.tr() : title),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
+      appBar: AppBar(title: Text(title.isEmpty ? 'dashboard'.tr() : title)),
       body: Center(
-        child: Text('welcome_dashboard'.tr(), style: Theme.of(context).textTheme.headlineSmall,
+        child: Text(
+          'welcome_dashboard'.tr(),
+          style: Theme.of(context).textTheme.headlineSmall,
         ),
       ),
     );

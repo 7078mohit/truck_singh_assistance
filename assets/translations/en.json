@@ -1176,7 +1176,7 @@
   "rating": "Rating",
   "ratingPeriodExpired": "Rating Period Expired",
   "ratingSavedSuccessfully": "Rating Saved Successfully",
-  "rating_expired": "Rating window expired. You can only rate within 3 Days after delivery.",
+  "rating_expired": "Rating window expired. You can only rate within 7 Days after delivery.",
   "rating_saved": "✅ Rating saved successfully",
   "ratings": "Ratings",
   "ratings_submitted_successfully": "Ratings submitted successfully",
