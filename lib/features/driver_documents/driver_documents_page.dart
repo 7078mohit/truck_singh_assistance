@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:logistics_toolkit/config/theme.dart';
 import '../../services/user_data_service.dart';
-import '../notifications/notification_service.dart';
 
 enum UserRole { agent, truckOwner, driver }
 
@@ -27,14 +26,13 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
   List<Map<String, dynamic>> _filteredDrivers = [];
   String? _loggedInUserId;
   UserRole? _userRole;
-  String? _loggedInUserName;
   late AnimationController _animationController;
-  String _selectedStatusFilter = 'All';
+  String _selectedStatusFilter = 'all';
   final List<String> _statusFilters = [
-    'All',
-    'Pending',
-    'Approved',
-    'Rejected',
+    'all',
+    'pending',
+    'approved',
+    'rejected',
   ];
 
   final Map<String, Map<String, dynamic>> _personalDocuments = {
@@ -73,28 +71,6 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     _animationController.dispose();
     super.dispose();
   }
-  // --- NEW HELPER FUNCTION ---
-  /// Finds the first agent/owner associated with a driver.
-  /// Returns the owner's custom_user_id.
-  Future<String?> _getPrimaryOwnerForDriver(String driverId) async {
-    try {
-      // Find the *first* relation for this driver
-      final response = await supabase
-          .from('driver_relation')
-          .select('owner_custom_id')
-          .eq('driver_custom_id', driverId)
-          .limit(1) // Get the first owner
-          .maybeSingle(); // Use maybeSingle in case there's no owner
-
-      if (response != null && response['owner_custom_id'] != null) {
-        return response['owner_custom_id'] as String;
-      }
-      return null;
-    } catch (e) {
-      print('Error finding driver owner: $e');
-      return null;
-    }
-  }
 
   Future<void> _initializeData() async {
     await _detectUserRole();
@@ -113,7 +89,6 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
           .single();
 
       _loggedInUserId = profile['custom_user_id'];
-      _loggedInUserName = profile['name'];
       final userType = profile['role'];
 
       if (userType == 'agent') {
@@ -192,18 +167,23 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
             return bTime.compareTo(aTime);
           });
           final doc = matched.isNotEmpty ? matched.first : {};
-          // Normalize status to readable values:
-          String status = 'Not Uploaded';
+          String statusKey = 'not_uploaded';
           if (doc.isNotEmpty) {
-            final raw = (doc['status'] ?? '').toString().trim();
-            if (raw.isEmpty || raw.toLowerCase() == 'null') {
-              status = 'Not Uploaded';
+            final raw = (doc['status'] ?? '').toString().trim().toLowerCase();
+            if (raw.isEmpty || raw == 'null') {
+              statusKey = 'not_uploaded';
+            } else if (raw.contains('pending')) {
+              statusKey = 'pending';
+            } else if (raw.contains('approved')) {
+              statusKey = 'approved';
+            } else if (raw.contains('rejected')) {
+              statusKey = 'rejected';
             } else {
-              status = raw; // keep whatever stored (pending/approved/rejected etc.)
+              statusKey = raw;
             }
           }
           docStatus[docType] = {
-            'status': status,
+            'status': statusKey,
             'file_url': doc['file_url'],
             'rejection_reason': doc['rejection_reason'],
           };
@@ -218,8 +198,6 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       setState(() {
         _drivers = driversWithStatus;
       });
-
-      // Apply filter after loaded
       _applyStatusFilter();
     } catch (e) {
       _showErrorSnackBar(e.toString());
@@ -228,10 +206,8 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     }
   }
 
-  /// APPLIES FILTER for agent/truckOwner list view
   void _applyStatusFilter() {
-    // Show all drivers
-    if (_selectedStatusFilter == 'All') {
+    if (_selectedStatusFilter.trim().toLowerCase() == 'all') {
       _filteredDrivers = List.from(_drivers);
       setState(() {});
       return;
@@ -241,16 +217,12 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
 
     _filteredDrivers = _drivers.where((driver) {
       final docs = driver['documents'] as Map<String, Map<String, dynamic>>;
-
       return docs.values.any((doc) {
         final docStatus = (doc['status'] ?? '').toString().toLowerCase().trim();
-
-        // For "Not Uploaded" stored as 'Not Uploaded' (human label), handle specially
-        if (filter == 'not uploaded') {
-          return docStatus == 'not uploaded' || docStatus.isEmpty || docStatus == 'null';
+        if (filter == 'not_uploaded') {
+          return docStatus == 'not_uploaded' || docStatus.isEmpty || docStatus == 'null';
         }
 
-        // Option A: Pending only -> docStatus must equal 'pending'
         return docStatus == filter;
       });
     }).toList();
@@ -258,24 +230,20 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     setState(() {});
   }
 
-  /// Returns filtered map of driver's personal documents for driver-screen
   Map<String, Map<String, dynamic>> _driverPersonalDocsFilteredForDriverView() {
     final driverDocs = _drivers.isNotEmpty
         ? _drivers.first['documents'] as Map<String, Map<String, dynamic>>
         : <String, Map<String, dynamic>>{};
 
-    if (_selectedStatusFilter == 'All') {
+    if (_selectedStatusFilter.trim().toLowerCase() == 'all') {
       return driverDocs;
     }
-
     final filter = _selectedStatusFilter.toLowerCase().trim();
-
-    // Keep only matching docs (Option A: Pending shows only status == 'pending')
     final Map<String, Map<String, dynamic>> result = {};
     driverDocs.forEach((k, v) {
       final docStatus = (v['status'] ?? '').toString().toLowerCase().trim();
-      if (filter == 'not uploaded') {
-        if (docStatus == 'not uploaded' || docStatus.isEmpty || docStatus == 'null') {
+      if (filter == 'not_uploaded') {
+        if (docStatus == 'not_uploaded' || docStatus.isEmpty || docStatus == 'null') {
           result[k] = v;
         }
       } else {
@@ -287,9 +255,23 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
 
     return result;
   }
+  String _localizedStatusLabel(String statusKey) {
+    final key = (statusKey ?? '').toString().toLowerCase().trim();
+    switch (key) {
+      case 'approved':
+        return 'approved'.tr();
+      case 'rejected':
+        return 'rejected'.tr();
+      case 'pending':
+        return 'pending'.tr();
+      case 'not_uploaded':
+        return 'not_uploaded'.tr();
+      default:
+        return key.isEmpty ? 'not_uploaded'.tr() : key.tr();
+    }
+  }
 
   Future<void> _uploadDocument(String driverId, String docType) async {
-    // allow driver to upload only their own doc
     if (_userRole == UserRole.driver && driverId != _loggedInUserId) {
       _showErrorSnackBar('Drivers can only upload their own documents');
       return;
@@ -308,12 +290,8 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       final fileName =
           '${driverId}_${docType.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.$ext';
       final filePath = 'driver_documents/$fileName';
-
-      // upload to bucket
       await supabase.storage.from('driver-documents').upload(filePath, file);
       final publicUrl = supabase.storage.from('driver-documents').getPublicUrl(filePath);
-
-      // upsert row in driver_documents (set status to pending)
       await supabase.from('driver_documents').upsert({
         'driver_custom_id': driverId,
         'document_type': docType,
@@ -324,66 +302,12 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
         'uploaded_by_role': _userRole == UserRole.agent ? 'agent' : 'driver',
         'document_category': 'personal',
         'user_id': supabase.auth.currentUser?.id,
-        'rejection_reason': null,
-        'reviewed_at': null,
-        'reviewed_by': null,
-      },
-        onConflict: 'driver_custom_id, document_type',
-      );
-
-      if (_userRole == UserRole.driver && driverId == _loggedInUserId) {
-        // SCENARIO 1: Driver uploads
-        final ownerId = await _getPrimaryOwnerForDriver(driverId);
-        final driverName = _drivers.firstWhere(
-              (d) => d['custom_user_id'] == driverId,
-          orElse: () => {'name': 'A driver'},
-        )['name'] ?? 'A driver';
-
-        // 1. Notify the owner
-        if (ownerId != null) {
-          NotificationService.sendPushNotificationToUser(
-            recipientId: ownerId,
-            title: 'Document Uploaded'.tr(),
-            message: '$driverName has uploaded a new document: $docType'.tr(),
-            data: {'type': 'document_upload', 'driver_id': driverId},
-          );
-        }
-
-        // 2. Notify self (the driver)
-        NotificationService.sendPushNotificationToUser(
-          recipientId: _loggedInUserId!,
-          title: 'Upload Successful'.tr(),
-          message: 'You have successfully uploaded your $docType.'.tr(),
-          data: {'type': 'document_upload_self', 'doc_type': docType},
-        );
-
-      }
-      else if (_userRole == UserRole.agent || _userRole == UserRole.truckOwner) {
-        final agentName = _loggedInUserName ?? "Your manager";
-        final driverName = _drivers.firstWhere(
-              (d) => d['custom_user_id'] == driverId,
-          orElse: () => {'name': 'the driver'},
-        )['name'] ?? 'the driver';
-
-        NotificationService.sendPushNotificationToUser(
-          recipientId: driverId,
-          title: 'Document Uploaded'.tr(),
-          message: '$agentName has uploaded a new document for you: $docType'.tr(),
-          data: {'type': 'document_upload', 'doc_type': docType},
-        );
-        NotificationService.sendPushNotificationToUser(
-          recipientId: _loggedInUserId!,
-          title: 'Upload Successful'.tr(),
-          message: 'You have successfully uploaded $docType for $driverName.'.tr(),
-          data: {'type': 'document_upload_self', 'driver_id': driverId},
-        );
-      }
+      });
 
       _showSuccessSnackBar('Document uploaded successfully');
       await _loadDriverDocuments();
     } catch (e) {
       _showErrorSnackBar('Error uploading document: ${e.toString()}');
-      print(e.toString());
     } finally {
       setState(() {
         _uploadingDriverId = null;
@@ -409,8 +333,6 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
         _showErrorSnackBar('no_document_found_to_approve'.tr());
         return;
       }
-
-      // choose most recent by updated_at (safer)
       docs.sort((a, b) {
         final aT = DateTime.tryParse(a['updated_at'] ?? '') ?? DateTime(1970);
         final bT = DateTime.tryParse(b['updated_at'] ?? '') ?? DateTime(1970);
@@ -423,16 +345,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
         'p_reviewed_by': supabase.auth.currentUser?.id,
         'p_reviewed_at': DateTime.now().toIso8601String(),
       });
-      NotificationService.sendPushNotificationToUser(
-        recipientId: driverId,
-        title: 'Document Approved'.tr(),
-        message: 'Your document ($docType) has been approved by your manager.'.tr(),
-        data: {
-          'type': 'document_status',
-          'doc_type': docType,
-          'status': 'approved',
-        },
-      );
+
       _showSuccessSnackBar('Document approved');
       await _loadDriverDocuments();
       _applyStatusFilter();
@@ -471,13 +384,10 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
       final doc = docs.first;
       final docId = doc['id'];
       final filePath = doc['file_path'] as String?;
-
-      // attempt remove file from storage (best-effort)
       if (filePath != null && filePath.isNotEmpty) {
         try {
           await supabase.storage.from('driver-documents').remove([filePath]);
         } catch (_) {
-          // continue even if removal fails
         }
       }
 
@@ -487,16 +397,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
         'p_rejection_reason': reason,
         'p_reviewed_at': DateTime.now().toIso8601String(),
       });
-      NotificationService.sendPushNotificationToUser(
-        recipientId: driverId,
-        title: 'Document Rejected'.tr(),
-        message: 'Your document ($docType) was rejected. Reason: $reason'.tr(),
-        data: {
-          'type': 'document_status',
-          'doc_type': docType,
-          'status': 'rejected',
-        },
-      );
+
       _showSuccessSnackBar('Document rejected');
       await _loadDriverDocuments();
       _applyStatusFilter();
@@ -566,7 +467,6 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
           : _userRole == UserRole.driver
           ? Column(
         children: [
-          // driver filter bar (works as requested: Pending => only 'pending')
           Container(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -577,17 +477,17 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: _statusFilters.map((status) {
-                        final isSelected = _selectedStatusFilter == status;
+                      children: _statusFilters.map((statusKey) {
+                        final displayLabel = statusKey.tr();
+                        final isSelected = _selectedStatusFilter == statusKey;
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: FilterChip(
-                            label: Text(status),
+                            label: Text(displayLabel),
                             selected: isSelected,
                             onSelected: (selected) {
                               setState(() {
-                                _selectedStatusFilter = status;
-                                // No need to re-fetch from DB; we already have docs loaded
+                                _selectedStatusFilter = statusKey;
                               });
                             },
                             backgroundColor: isSelected ? AppColors.teal : null,
@@ -602,7 +502,6 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
               ],
             ),
           ),
-          // driver documents - filtered according to selected status
           Expanded(
             child: _buildDriverUploadInterfaceFiltered(),
           ),
@@ -623,16 +522,17 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: _statusFilters.map((status) {
-                    final selected = _selectedStatusFilter == status;
+                  children: _statusFilters.map((statusKey) {
+                    final displayLabel = statusKey.tr();
+                    final selected = _selectedStatusFilter == statusKey;
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: FilterChip(
-                        label: Text(status),
+                        label: Text(displayLabel),
                         selected: selected,
                         onSelected: (v) {
                           setState(() {
-                            _selectedStatusFilter = status;
+                            _selectedStatusFilter = statusKey;
                             _applyStatusFilter();
                           });
                         },
@@ -693,7 +593,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
 
   Widget _buildDocumentTile(String driverId, String docType, Map<String, dynamic> docConfig,
       Map<String, dynamic> docStatus) {
-    final status = (docStatus['status'] ?? 'Not Uploaded').toString();
+    final statusKey = (docStatus['status'] ?? 'not_uploaded').toString();
     final fileUrl = docStatus['file_url'] as String?;
     final rejectionReason = docStatus['rejection_reason'] as String?;
     final uploading = _uploadingDriverId == driverId && _uploadingDocType == docType;
@@ -706,7 +606,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     }
 
     Color color;
-    switch (status.toLowerCase()) {
+    switch (statusKey.toLowerCase()) {
       case 'approved':
         color = Colors.green;
         break;
@@ -735,7 +635,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(color: color.withOpacity(0.1), border: Border.all(color: color), borderRadius: BorderRadius.circular(12)),
-              child: Text(status, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+              child: Text(_localizedStatusLabel(statusKey), style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
             ),
             if (rejectionReason != null && rejectionReason.isNotEmpty)
               Padding(
@@ -748,16 +648,16 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
         if (uploading)
           const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
         else
-          _buildActionButtons(driverId, docType, status, fileUrl, canUpload),
+          _buildActionButtons(driverId, docType, statusKey, fileUrl, canUpload),
       ]),
     );
   }
 
-  Widget _buildActionButtons(String driverId, String docType, String status, String? fileUrl, bool canUpload) {
-    final statusLower = (status ?? '').toString().toLowerCase();
+  Widget _buildActionButtons(String driverId, String docType, String statusKey, String? fileUrl, bool canUpload) {
+    final statusLower = (statusKey ?? '').toString().toLowerCase();
     final buttons = <Widget>[];
 
-    if ((statusLower == 'not uploaded' || statusLower == 'rejected' || statusLower == '') && canUpload) {
+    if ((statusLower == 'not_uploaded' || statusLower == 'rejected' || statusLower == '') && canUpload) {
       buttons.add(ElevatedButton(
         onPressed: () => _uploadDocument(driverId, docType),
         style: ElevatedButton.styleFrom(
@@ -765,11 +665,11 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         ),
-        child: Text(statusLower == 'rejected' ? 'Re-upload' : 'Upload', style: const TextStyle(fontSize: 10)),
+        child: Text(statusLower == 'rejected' ? 're_upload'.tr() : 'upload'.tr(), style: const TextStyle(fontSize: 10)),
       ));
     }
 
-    if (statusLower != 'not uploaded' && fileUrl != null) {
+    if (statusLower != 'not_uploaded' && fileUrl != null) {
       buttons.add(IconButton(
         icon: Icon(Icons.visibility_outlined, color: AppColors.teal, size: 18),
         onPressed: () async {
@@ -797,26 +697,21 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
     return Wrap(spacing: 4, children: buttons);
   }
 
-  // DRIVER-SIDE: build UI filtered by _selectedStatusFilter (Option A: pending shows only pending)
   Widget _buildDriverUploadInterfaceFiltered() {
     final filteredDocs = _driverPersonalDocsFilteredForDriverView();
-
-    // If filter is All, show all cards in preset order
-    if (_selectedStatusFilter == 'All') {
+    if (_selectedStatusFilter.trim().toLowerCase() == 'all') {
       return SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: _personalDocuments.entries.map((entry) {
             final docType = entry.key;
-            final docData = filteredDocs[docType] ?? {'status': 'Not Uploaded'};
+            final docData = filteredDocs[docType] ?? {'status': 'not_uploaded'};
             return _buildDriverCardDocument(docType, entry.value, docData);
           }).toList(),
         ),
       );
     }
-
-    // If not All, show only matching docs. If none, show message.
     if (filteredDocs.isEmpty) {
       return Center(child: Text('no_documents_matching_filter'.tr()));
     }
@@ -836,7 +731,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
   }
 
   Widget _buildDriverCardDocument(String docType, Map<String, dynamic> config, Map<String, dynamic> docData) {
-    final status = (docData['status'] ?? 'Not Uploaded').toString();
+    final statusKey = (docData['status'] ?? 'not_uploaded').toString();
     final rejectionReason = docData['rejection_reason'] as String?;
     final isUploading = _uploadingDriverId == _loggedInUserId && _uploadingDocType == docType;
 
@@ -849,7 +744,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
             Icon(config['icon'], size: 24, color: AppColors.teal),
             const SizedBox(width: 12),
             Expanded(child: Text(docType, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
-            _buildStatusChip(status),
+            _buildStatusChip(_localizedStatusLabel(statusKey)),
           ]),
           const SizedBox(height: 12),
           if (rejectionReason != null && rejectionReason.isNotEmpty)
@@ -864,45 +759,42 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
             ),
           if (rejectionReason != null && rejectionReason.isNotEmpty) const SizedBox(height: 12),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('Status: $status', style: const TextStyle(fontSize: 14, color: Colors.grey)),
+            Text('Status: ${_localizedStatusLabel(statusKey)}', style: const TextStyle(fontSize: 14, color: Colors.grey)),
             if (isUploading)
               const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-            else if (status.toLowerCase() == 'not uploaded' || status.toLowerCase() == 'rejected')
+            else if (statusKey.toLowerCase() == 'not_uploaded' || statusKey.toLowerCase() == 'rejected')
               ElevatedButton.icon(
                 onPressed: () => _uploadDocument(_loggedInUserId!, docType),
                 icon: const Icon(Icons.upload_file, size: 16),
-                label: Text(status.toLowerCase() == 'rejected' ? 'Re-upload' : 'Upload'),
+                label: Text(statusKey.toLowerCase() == 'rejected' ? 're_upload'.tr() : 'upload'.tr()),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal, foregroundColor: Colors.white),
               )
-            else if (status.toLowerCase() == 'pending')
+            else if (statusKey.toLowerCase() == 'pending')
                 Text('under_review'.tr(), style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold))
-              else if (status.toLowerCase() == 'approved')
-                  Row(children: const [Icon(Icons.check_circle, color: Colors.green, size: 16), SizedBox(width: 4), Text('Approved', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))]),
+              else if (statusKey.toLowerCase() == 'approved')
+                  Row(children: [Icon(Icons.check_circle, color: Colors.green, size: 16), const SizedBox(width: 4), Text('approved'.tr(), style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold))]),
           ])
         ]),
       ),
     );
   }
 
-  Widget _buildStatusChip(String status) {
+  Widget _buildStatusChip(String statusLabel) {
+    String lower = statusLabel.toLowerCase();
     Color bg, text;
-    switch (status.toLowerCase()) {
-      case 'approved':
-        bg = Colors.green.shade100;
-        text = Colors.green.shade800;
-        break;
-      case 'rejected':
-        bg = Colors.red.shade100;
-        text = Colors.red.shade800;
-        break;
-      case 'pending':
-        bg = Colors.orange.shade100;
-        text = Colors.orange.shade800;
-        break;
-      default:
-        bg = Colors.grey.shade100;
-        text = Colors.grey.shade800;
+    if (lower.contains('approved') || lower.contains('स्वीकृत') ) {
+      bg = Colors.green.shade100;
+      text = Colors.green.shade800;
+    } else if (lower.contains('rejected') || lower.contains('अस्वीकृत') || lower.contains('अस्वीकृत')) {
+      bg = Colors.red.shade100;
+      text = Colors.red.shade800;
+    } else if (lower.contains('pending') || lower.contains('लंबित')) {
+      bg = Colors.orange.shade100;
+      text = Colors.orange.shade800;
+    } else {
+      bg = Colors.grey.shade100;
+      text = Colors.grey.shade800;
     }
-    return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)), child: Text(status, style: TextStyle(color: text, fontWeight: FontWeight.bold, fontSize: 12)));
+    return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)), child: Text(statusLabel, style: TextStyle(color: text, fontWeight: FontWeight.bold, fontSize: 12)));
   }
 }

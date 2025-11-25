@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'complain_detail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart' as ptr;
 
 class ComplaintHistoryPage extends StatefulWidget {
   final String? initialComplaintId;
@@ -18,17 +20,18 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
   List<Map<String, dynamic>> allComplaints = [];
   bool loading = true;
   String? error;
-  late TabController _tabController;
+  TabController? _tabController;
   String? _currentUserRole;
   String _statusFilter = 'All';
   String _typeFilter = 'All';
   DateTimeRange? _dateRange;
   String _searchQuery = '';
+  final ptr.RefreshController _refreshController =
+  ptr.RefreshController(initialRefresh: false);
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     fetchCurrentUserRoleAndComplaints();
   }
 
@@ -69,6 +72,11 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
       _currentUserRole = profile?['role'];
       final customUserId = profile?['custom_user_id'];
 
+      // Create tab controller after we know the role
+      int tabCount = _isAdminOnly(_currentUserRole) ? 1 : 2;
+      _tabController?.dispose();
+      _tabController = TabController(length: tabCount, vsync: this);
+
       final madeRes = await supabase
           .from('complaints')
           .select()
@@ -82,7 +90,7 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
           .order('created_at', ascending: false);
 
       List<Map<String, dynamic>> allRes = [];
-      if (_isAgentOrAdmin(_currentUserRole)) {
+      if (_isAdminOnly(_currentUserRole)) {
         final all = await supabase
             .from('complaints')
             .select()
@@ -101,19 +109,41 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
         error = e.toString();
         loading = false;
       });
+    } finally {
+      _refreshController.refreshCompleted();
     }
   }
 
-  bool _isAgentOrAdmin(String? role) {
-    return role == 'agent' ||
-        role == 'admin' ||
-        role == 'truckowner' ||
-        role == 'company';
+  /// Admin detector (keeps compatibility with company role)
+  bool _isAdminOnly(String? role) {
+    if (role == null) return false;
+    final r = role.toLowerCase();
+    return r == 'company' || r.contains('admin');
+  }
+
+  /// NEW: only mark overdue if complaint is Open and older than 7 days
+  bool _isOverdueOpenComplaint(Map<String, dynamic> c) {
+    try {
+      final status = (c['status'] ?? '').toString();
+      if (status != 'Open') return false; // <-- critical: only Open
+
+      final createdRaw = c['created_at'] ?? c['createdAt'] ?? c['createdAtUtc'];
+      if (createdRaw == null) return false;
+
+      final created = DateTime.tryParse(createdRaw.toString());
+      if (created == null) return false;
+
+      final createdLocal = created.toLocal();
+      final limit = createdLocal.add(const Duration(days: 7));
+
+      return DateTime.now().isAfter(limit);
+    } catch (_) {
+      return false;
+    }
   }
 
   List<Map<String, dynamic>> _applyFilters(
-      List<Map<String, dynamic>> complaints,
-      ) {
+      List<Map<String, dynamic>> complaints) {
     return complaints.where((c) {
       if (_statusFilter != 'All' && (c['status'] ?? 'Open') != _statusFilter)
         return false;
@@ -123,7 +153,7 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
         return false;
 
       if (_dateRange != null && c['created_at'] != null) {
-        final dt = DateTime.tryParse(c['created_at']);
+        final dt = DateTime.tryParse(c['created_at'])?.toLocal();
         if (dt == null ||
             dt.isBefore(_dateRange!.start) ||
             dt.isAfter(_dateRange!.end)) return false;
@@ -162,24 +192,23 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
                   DropdownMenuItem(value: 'Open', child: Text('open'.tr())),
                   DropdownMenuItem(
                       value: 'Clarified', child: Text('clarified'.tr())),
-                  DropdownMenuItem(value: 'Resolved', child: Text('resolved'.tr())),
-                  DropdownMenuItem(value: 'Rejected', child: Text('rejected'.tr())),
+                  DropdownMenuItem(
+                      value: 'Resolved', child: Text('resolved'.tr())),
+                  DropdownMenuItem(
+                      value: 'Rejected', child: Text('rejected'.tr())),
                 ],
                 onChanged: (val) => setState(() => _statusFilter = val ?? 'All'),
               ),
-
-              // Type Dropdown
               DropdownButton<String>(
                 value: _typeFilter,
                 items: [
                   DropdownMenuItem(value: 'All', child: Text('all_types'.tr())),
                   DropdownMenuItem(value: 'user', child: Text('user'.tr())),
-                  DropdownMenuItem(value: 'shipment', child: Text('shipment'.tr())),
+                  DropdownMenuItem(
+                      value: 'shipment', child: Text('shipment'.tr())),
                 ],
                 onChanged: (val) => setState(() => _typeFilter = val ?? 'All'),
               ),
-
-              // Date Range Picker
               OutlinedButton(
                 onPressed: () async {
                   final picked = await showDateRangePicker(
@@ -196,8 +225,6 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
                       : '${_dateRange!.start.month}/${_dateRange!.start.day} - ${_dateRange!.end.month}/${_dateRange!.end.day}',
                 ),
               ),
-
-              // Clear date button
               if (_dateRange != null)
                 IconButton(
                   icon: const Icon(Icons.clear),
@@ -206,8 +233,6 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
             ],
           ),
           const SizedBox(height: 8),
-
-          // Search field
           TextField(
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
@@ -221,7 +246,6 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
       ),
     );
   }
-
 
   String _getDisplayRole(String role) {
     switch (role) {
@@ -254,7 +278,7 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
     final filtered = _applyFilters(complaints);
 
     if (filtered.isEmpty) {
-      return  Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -279,132 +303,175 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
       itemCount: filtered.length,
       itemBuilder: (context, index) {
         final complaint = filtered[index];
-        final date = DateTime.tryParse(complaint['created_at'] ?? '');
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          elevation: 2,
-          child: ListTile(
-            leading: Stack(
-              children: [
-                const CircleAvatar(
-                  backgroundColor: Colors.blue,
-                  child: Icon(Icons.report, color: Colors.white, size: 16),
-                ),
-                if (complaint['is_clarified'] == true)
-                  const Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Icon(Icons.verified, color: Colors.green, size: 16),
+        // Use local time for display and overdue calculation
+        final created = DateTime.tryParse(complaint['created_at'] ?? '')
+            ?.toLocal(); // may be null
+        final isOverdue = _isOverdueOpenComplaint(complaint);
+
+        int overdueDays = 0;
+        if (created != null) {
+          final limit = created.add(const Duration(days: 7));
+          if (DateTime.now().isAfter(limit)) {
+            overdueDays = DateTime.now().difference(limit).inDays;
+          }
+        }
+
+        final displayDate = created;
+
+        return Container(
+          decoration: isOverdue
+              ? BoxDecoration(
+            border: Border.all(color: Colors.red.shade400, width: 2),
+            borderRadius: BorderRadius.circular(12),
+          )
+              : null,
+          child: Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            elevation: 2,
+            child: ListTile(
+              leading: Stack(
+                children: [
+                  const CircleAvatar(
+                    backgroundColor: Colors.blue,
+                    child: Icon(Icons.report, color: Colors.white, size: 16),
                   ),
-              ],
-            ),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    complaint['subject'] ?? 'No Subject',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (_shouldShowStatusBadge(complaint))
-                  Container(
-                    margin: const EdgeInsets.only(left: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
+                  if (complaint['is_clarified'] == true)
+                    const Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Icon(Icons.verified, color: Colors.green, size: 16),
                     ),
-                    decoration: BoxDecoration(
-                      color: complaint['status'] == 'Resolved'
-                          ? Colors.green
-                          : Colors.red,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                ],
+              ),
+              title: Row(
+                children: [
+                  Expanded(
                     child: Text(
-                      complaint['status'],
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                      complaint['subject'] ?? 'No Subject',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+
+                  // Overdue badge: only for Open & > 7 days (NEW)
+                  if (isOverdue)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      margin: const EdgeInsets.only(left: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        "Overdue (${overdueDays} days)",
+                        style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
-                  ),
-                if (_shouldShowJustificationIndicator(complaint))
-                  Container(
-                    margin: const EdgeInsets.only(left: 4),
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Colors.orange,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-              ],
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  complaint['complaint'] ?? 'No details',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (showParties) ...[
-                  FutureBuilder(
-                    future: _fetchUserNamesAndRoles(complaint),
-                    builder: (context, AsyncSnapshot<List<String>> snapshot) {
-                      if (!snapshot.hasData) return const SizedBox.shrink();
-                      final parties = snapshot.data!;
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: Text(
-                          'By: ${parties[0]}   |   Against: ${parties[1]}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.blueGrey,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-                const SizedBox(height: 4),
-                Row(
-                  children: [
+
+                  if (_shouldShowStatusBadge(complaint))
                     Container(
+                      margin: const EdgeInsets.only(left: 8),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
+                        color: complaint['status'] == 'Resolved'
+                            ? Colors.green
+                            : Colors.red,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child:  Text(
-                        'complaint'.tr(),
-                        style: TextStyle(
+                      child: Text(
+                        complaint['status'] ?? '',
+                        style: const TextStyle(
+                          color: Colors.white,
                           fontSize: 10,
-                          color: Colors.blue,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                    const Spacer(),
-                    if (date != null)
-                      Text(
-                        DateFormat('MMM dd').format(date),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
+                  if (_shouldShowJustificationIndicator(complaint))
+                    Container(
+                      margin: const EdgeInsets.only(left: 4),
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.orange,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    complaint['complaint'] ?? 'No details',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (showParties) ...[
+                    FutureBuilder(
+                      future: _fetchUserNamesAndRoles(complaint),
+                      builder:
+                          (context, AsyncSnapshot<List<String>> snapshot) {
+                        if (!snapshot.hasData) return const SizedBox.shrink();
+                        final parties = snapshot.data!;
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            'By: ${parties[0]}   |   Against: ${parties[1]}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.blueGrey,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'complaint'.tr(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                  ],
-                ),
-              ],
+                      const Spacer(),
+                      if (displayDate != null)
+                        Text(
+                          DateFormat('MMM dd').format(displayDate),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+              onTap: () => showComplaintDetails(complaint),
             ),
-            onTap: () => showComplaintDetails(complaint),
           ),
         );
       },
@@ -417,14 +484,13 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
   }
 
   bool _shouldShowJustificationIndicator(Map<String, dynamic> complaint) {
-    return (complaint['agent_justification'] ?? '').isNotEmpty &&
+    return (complaint['agent_justification'] ?? '').toString().isNotEmpty &&
         complaint['status'] != 'Open' &&
         complaint['status'] != 'Clarified';
   }
 
   Future<List<String>> _fetchUserNamesAndRoles(
-      Map<String, dynamic> complaint,
-      ) async {
+      Map<String, dynamic> complaint) async {
     final supabase = Supabase.instance.client;
     String complainer = '';
     String target = '';
@@ -462,32 +528,30 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title:  Text('complaint_history'.tr()),
+        title: Text('complaint_history'.tr()),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: fetchCurrentUserRoleAndComplaints,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
+        bottom: _tabController == null
+            ? null
+            : TabBar(
+          controller: _tabController!,
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white.withOpacity(0.7),
-          labelStyle: TextStyle(
+          labelStyle: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
-          unselectedLabelStyle: TextStyle(
+          unselectedLabelStyle: const TextStyle(
             fontWeight: FontWeight.normal,
             fontSize: 14,
           ),
           tabs: [
-            Tab(text: 'complaints_made'.tr()),
-            Tab(text: 'complaints_against'.tr()),
-            if (_isAgentOrAdmin(_currentUserRole))
+            if (!_isAdminOnly(_currentUserRole)) ...[
+              Tab(text: 'complaints_made'.tr()),
+              Tab(text: 'complaints_against'.tr()),
+            ],
+            if (_isAdminOnly(_currentUserRole))
               Tab(text: 'all_complaints'.tr()),
           ],
         ),
@@ -500,15 +564,26 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
         children: [
           _buildFilters(),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildComplaintList(complaintsMade),
-                _buildComplaintList(complaintsAgainst),
-                if (_isAgentOrAdmin(_currentUserRole))
-                  _buildComplaintList(allComplaints,
-                      showParties: true),
-              ],
+            child: _tabController == null
+                ? const SizedBox()
+                : ptr.SmartRefresher(
+              controller: _refreshController,
+              onRefresh: fetchCurrentUserRoleAndComplaints,
+              enablePullDown: true,
+              enablePullUp: false,
+              header: const ptr.WaterDropHeader(),
+              child: TabBarView(
+                controller: _tabController!,
+                children: [
+                  if (!_isAdminOnly(_currentUserRole)) ...[
+                    _buildComplaintList(complaintsMade),
+                    _buildComplaintList(complaintsAgainst),
+                  ],
+                  if (_isAdminOnly(_currentUserRole))
+                    _buildComplaintList(allComplaints,
+                        showParties: true),
+                ],
+              ),
             ),
           ),
         ],
@@ -525,18 +600,18 @@ class _ComplaintHistoryPageState extends State<ComplaintHistoryPage>
           const SizedBox(height: 16),
           Text(
             'error_loading_complaints'.tr(),
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            error!,
+            error ?? '',
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: fetchCurrentUserRoleAndComplaints,
-            child:  Text('retry'.tr()),
+            child: Text('retry'.tr()),
           ),
         ],
       ),

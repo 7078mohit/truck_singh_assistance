@@ -1,34 +1,31 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:logistics_toolkit/config/theme.dart';
-import 'package:logistics_toolkit/features/Report%20Analysis/report_chart.dart';
-import 'package:logistics_toolkit/features/bilty/shipment_selection_page.dart';
-import 'package:logistics_toolkit/features/tracking/shared_shipments_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../dashboard/widgets/feature_card.dart';
-import '../features/shipment/shipper_form_page.dart';
-import '../features/trips/myTrips_history.dart';
 import '../widgets/common/app_bar.dart';
-import '../features/auth/services/supabase_service.dart';
 import '../services/onesignal_notification_service.dart';
-import '../features/settings/presentation/screen/settings_page.dart';
+import '../features/auth/services/supabase_service.dart';
+import '../features/Report Analysis/report_chart.dart';
+import '../features/bilty/shipment_selection_page.dart';
+import '../features/tracking/shared_shipments_page.dart';
+import '../features/shipment/shipper_form_page.dart';
 import '../features/laod_assignment/presentation/cubits/shipment_cubit.dart';
 import '../features/laod_assignment/presentation/screen/load_assignment_screen.dart';
 import '../features/laod_assignment/presentation/screen/allLoads.dart';
 import '../features/trips/myTrips.dart';
+import '../features/trips/myTrips_history.dart';
 import '../features/mytruck/mytrucks.dart';
 import '../features/mydrivers/mydriver.dart';
 import '../features/ratings/presentation/screen/trip_ratings.dart';
+import '../features/chat/agent_chat_list_page.dart';
 import '../features/complains/mycomplain.dart';
-import '../features/invoice/services/invoice_pdf_service.dart';
-import '../features/bilty/transport_bilty_form.dart';
+import '../features/settings/presentation/screen/settings_page.dart';
 import '../features/driver_documents/driver_documents_page.dart';
 import '../features/truck_documents/truck_documents_page.dart';
-import '../features/chat/agent_chat_list_page.dart'; // Import for Agent Chat
-import 'package:easy_localization/easy_localization.dart';
 
-// A simple model to hold all the data and state for the dashboard
 class DashboardState {
   final bool isLoading;
   final String? error;
@@ -50,18 +47,16 @@ class DashboardState {
     Map<String, dynamic>? userProfile,
     Map<String, dynamic>? activeShipment,
     Map<String, int>? shipmentStats,
-  }) {
-    return DashboardState(
-      isLoading: isLoading ?? this.isLoading,
-      error: error,
-      userProfile: userProfile ?? this.userProfile,
-      activeShipment: activeShipment,
-      shipmentStats: shipmentStats ?? this.shipmentStats,
-    );
-  }
+  }) =>
+      DashboardState(
+        isLoading: isLoading ?? this.isLoading,
+        error: error,
+        userProfile: userProfile ?? this.userProfile,
+        activeShipment: activeShipment ?? this.activeShipment,
+        shipmentStats: shipmentStats ?? this.shipmentStats,
+      );
 }
 
-// UserService with more efficient queries
 class UserService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
@@ -69,47 +64,23 @@ class UserService {
     final user = _supabase.auth.currentUser;
     if (user == null) throw Exception('User not authenticated');
 
-    return await _supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+    return await _supabase.from('user_profiles').select('*').eq('user_id', user.id).single();
   }
 
-  // Corrected: Uses efficient .count() method
-  Future<Map<String, int>> getShipmentStats(String customUserId) async {
-    final activeLoadsResponse = await _supabase
-        .from('shipment')
-        .count(CountOption.exact)
-        .eq('assigned_agent', customUserId)
-        .neq('booking_status', 'Completed');
+  Future<Map<String, int>> getShipmentStats(String id) async {
+    final active = await _supabase.from('shipment').count(CountOption.exact).eq('assigned_agent', id).neq('booking_status', 'Completed');
+    final completed = await _supabase.from('shipment').count(CountOption.exact).eq('assigned_agent', id).eq('booking_status', 'Completed');
 
-    final completedLoadsResponse = await _supabase
-        .from('shipment')
-        .count(CountOption.exact)
-        .eq('assigned_agent', customUserId)
-        .eq('booking_status', 'Completed');
-
-    return {
-      'activeLoads': activeLoadsResponse,
-      'completedLoads': completedLoadsResponse,
-    };
+    return {'activeLoads': active, 'completedLoads': completed};
   }
 
-  Future<Map<String, dynamic>?> getActiveShipment(String customUserId) async {
+  Future<Map<String, dynamic>?> getActiveShipment(String id) async {
     return await _supabase
         .from('shipment')
-        .select(
-          'shipment_id, assigned_driver',
-        ) // Select only what's needed for the chat
-        .eq('assigned_agent', customUserId)
-        .filter('booking_status', 'in', [
-          'Accepted',
-          'En Route to Pickup',
-          'Arrived at Pickup',
-          'In Transit',
-        ])
-        .order('created_at', ascending: false)
+        .select('shipment_id, assigned_driver')
+        .eq('assigned_agent', id)
+        .filter('booking_status', 'in', ['Accepted', 'En Route to Pickup', 'Arrived at Pickup', 'In Transit'])
+        .order('created_at')
         .limit(1)
         .maybeSingle();
   }
@@ -123,8 +94,8 @@ class AgentDashboard extends StatefulWidget {
 }
 
 class _AgentDashboardState extends State<AgentDashboard> {
-  final UserService _userService = UserService();
-  DashboardState _dashboardState = DashboardState();
+  DashboardState _dashboard = DashboardState();
+  final _userService = UserService();
 
   @override
   void initState() {
@@ -134,379 +105,140 @@ class _AgentDashboardState extends State<AgentDashboard> {
   }
 
   Future<void> _loadDashboardData() async {
-    setState(() => _dashboardState = _dashboardState.copyWith(isLoading: true));
-
+    setState(() => _dashboard = _dashboard.copyWith(isLoading: true));
     try {
       final profile = await _userService.getUserProfile();
-      final customUserId = profile['custom_user_id'];
-      if (customUserId == null) throw Exception('Custom user ID is missing.');
+      final id = profile['custom_user_id'];
 
-      // Fetch stats and active shipment in parallel for better performance
       final results = await Future.wait([
-        _userService.getShipmentStats(customUserId),
-        _userService.getActiveShipment(customUserId),
+        _userService.getShipmentStats(id),
+        _userService.getActiveShipment(id),
       ]);
 
-      // Safely cast results
-      final stats = results[0] as Map<String, int>;
-      final activeShipment = results[1] as Map<String, dynamic>?;
-
-      if (mounted) {
-        setState(() {
-          _dashboardState = _dashboardState.copyWith(
-            isLoading: false,
-            userProfile: profile,
-            shipmentStats: stats,
-            activeShipment: activeShipment,
-          );
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(
-          () => _dashboardState = _dashboardState.copyWith(
-            isLoading: false,
-            error: e.toString(),
-          ),
+      if (!mounted) return;
+      setState(() {
+        _dashboard = _dashboard.copyWith(
+          isLoading: false,
+          userProfile: profile,
+          shipmentStats: results[0] as Map<String, int>,
+          activeShipment: results[1] as Map<String, dynamic>?,
         );
-        _showErrorSnackBar("Failed to load dashboard: ${e.toString()}");
-      }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _dashboard = _dashboard.copyWith(isLoading: false, error: e.toString()));
+      _showSnack("Failed to load dashboard: $e");
     }
   }
 
-  Widget _buildBottomAppBar() {
-    return BottomAppBar(
-      elevation: 10.0,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-        child: ElevatedButton.icon(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ReportAnalysisPage(),
-              ),
-            );
-          },
-          icon: const Icon(Icons.analytics_outlined),
-          label: Text('viewreport&analysis'.tr()),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            backgroundColor: AppColors.orange,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10.0),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  void _push(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
-  void _showErrorSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
-      );
-    }
-  }
+  void _showSnack(String msg) => ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final currentLocale = context.locale;
     return Scaffold(
-      //backgroundColor: const Color(0xFFF5F7FA),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-
-      appBar: _buildAppBar(),
-      body: _dashboardState.isLoading
+      appBar: CustomAppBar(
+        showProfile: true,
+        userProfile: _dashboard.userProfile,
+        isLoading: _dashboard.isLoading,
+        shipment: _dashboard.activeShipment,
+        showMessages: true,
+        onProfileTap: () => _push(const SettingsPage()),
+      ),
+      body: _dashboard.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _dashboardState.error != null
-          ? Center(child: Text('Error: ${_dashboardState.error}'))
+          : _dashboard.error != null
+          ? Center(child: Text("Error: ${_dashboard.error}"))
           : RefreshIndicator(
-              onRefresh: _loadDashboardData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    _buildPerformanceOverviewCard(),
-                    const SizedBox(height: 20),
-                    _buildFeatureGrid(),
-                  ],
-                ),
-              ),
-            ),
-      bottomNavigationBar: _buildBottomAppBar(),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar() {
-    return CustomAppBar(
-      showProfile: true,
-      userProfile: _dashboardState.userProfile,
-      isLoading: _dashboardState.isLoading,
-      shipment: _dashboardState.activeShipment,
-      showMessages: true, // Enable the message button
-      onProfileTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const SettingsPage()),
-        );
-        if (mounted) setState(() {});
-      },
-    );
-  }
-
-  Widget _buildPerformanceOverviewCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.green.shade700, Colors.green.shade500],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'performanceOverview'.tr(),
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildOverviewItem(
-                  'activeLoads'.tr(),
-                  '${_dashboardState.shipmentStats['activeLoads']}',
-                  Icons.local_shipping,
-                ),
-              ),
-              Expanded(
-                child: _buildOverviewItem(
-                  'completed'.tr(),
-                  '${_dashboardState.shipmentStats['completedLoads']}',
-                  Icons.check_circle,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOverviewItem(String label, String value, IconData icon) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+        onRefresh: _loadDashboardData,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            Icon(icon, color: Colors.white70, size: 16),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-            ),
+            _performanceCard(),
+            const SizedBox(height: 20),
+            _featureGrid(),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+      ),
+      bottomNavigationBar: BottomAppBar(
+        child: ElevatedButton.icon(
+          onPressed: () => _push(const ReportAnalysisPage()),
+          icon: const Icon(Icons.analytics_outlined),
+          label: Text('viewreport&analysis'.tr()),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.orange,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.all(12),
           ),
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildFeatureGrid() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 1.1,
+  Widget _performanceCard() => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(colors: [Colors.green.shade700, Colors.green.shade500]),
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [BoxShadow(color: Colors.green.withOpacity(.3), blurRadius: 8)],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        FeatureCard(
-          title: 'findShipments'.tr(),
-          subtitle: 'availableLoads'.tr(),
-          icon: Icons.search_outlined,
-          color: Colors.teal,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => BlocProvider(
-                create: (context) => ShipmentCubit(),
-                child: const LoadAssignmentScreen(),
-              ),
-            ),
-          ),
-        ),
-        FeatureCard(
-          title: 'createShipment'.tr(),
-          subtitle: 'postNewLoad'.tr(),
-          icon: Icons.add_box_rounded,
-          color: Colors.teal,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ShipperFormPage()),
-          ),
-        ),
-        FeatureCard(
-          title: 'myChats'.tr(), // New Card
-          subtitle: 'viewConversations'.tr(),
-          icon: Icons.chat_bubble_outline,
-          color: Colors.blue,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AgentChatListPage()),
-          ),
-        ),
-        FeatureCard(
-          title: 'loadBoard'.tr(),
-          subtitle: 'browsePostLoads'.tr(),
-          icon: Icons.view_list_outlined,
-          color: Colors.blue,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => BlocProvider(
-                create: (context) => ShipmentCubit(),
-                child: const allLoadsPage(),
-              ),
-            ),
-          ),
-        ),
-        FeatureCard(
-          title: 'activeTrips'.tr(),
-          subtitle: 'monitorLiveLocations'.tr(),
-          icon: Icons.map_outlined,
-          color: Colors.orange,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const MyShipments()),
-          ),
-        ),
-        FeatureCard(
-          title: 'sharedtrips'.tr(),
-          subtitle: 'sharedtracking'.tr(),
-          icon: Icons.share_location,
-          color: Colors.orange,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const SharedShipmentsPage(),
-            ),
-          ),
-        ),
-        FeatureCard(
-          title: 'myTrucks'.tr(),
-          subtitle: 'addTrackVehicles'.tr(),
-          icon: Icons.local_shipping_outlined,
-          color: Colors.blue,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const Mytrucks()),
-          ),
-        ),
-        FeatureCard(
-          title: 'myDrivers'.tr(),
-          subtitle: 'addTrackDrivers'.tr(),
-          icon: Icons.people_outlined,
-          color: Colors.deepPurple,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const MyDriverPage()),
-          ),
-        ),
-        FeatureCard(
-          title: 'ratings'.tr(),
-          subtitle: 'viewRatings'.tr(),
-          icon: Icons.star_outline,
-          color: Colors.orange,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const TripRatingsPage()),
-          ),
-        ),
-        FeatureCard(
-          title: 'complaints'.tr(),
-          subtitle: 'fileOrView'.tr(),
-          icon: Icons.feedback_outlined,
-          color: Colors.deepOrange,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ComplaintHistoryPage(),
-            ),
-          ),
-        ),
-        FeatureCard(
-          title: 'myTrips'.tr(),
-          subtitle: 'historyDetails'.tr(),
-          icon: Icons.route_outlined,
-          color: Colors.blueGrey,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const MyTripsHistory()),
-          ),
-        ),
-        FeatureCard(
-          title: 'bilty'.tr(),
-          subtitle: 'createConsignmentNote'.tr(),
-          icon: Icons.receipt_long,
-          color: Colors.green,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ShipmentSelectionPage(),
-            ),
-          ),
-        ),
-        FeatureCard(
-          title: 'driverDocuments'.tr(),
-          subtitle: 'manageDriverRecords'.tr(),
-          icon: Icons.person_outline,
-          color: Colors.deepPurple,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const DriverDocumentsPage(),
-            ),
-          ),
-        ),
-        FeatureCard(
-          title: 'truckDocuments'.tr(),
-          subtitle: 'documents_subtitle'.tr(),
-          icon: Icons.local_shipping_outlined,
-          color: Colors.blue,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const TruckDocumentsPage()),
-          ),
+        Text('performanceOverview'.tr(), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 15),
+        Row(
+          children: [
+            Expanded(child: _stat('activeLoads'.tr(), '${_dashboard.shipmentStats['activeLoads']}', Icons.local_shipping)),
+            Expanded(child: _stat('completed'.tr(), '${_dashboard.shipmentStats['completedLoads']}', Icons.check_circle)),
+          ],
         ),
       ],
+    ),
+  );
+
+  Widget _stat(String label, String value, IconData icon) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(children: [Icon(icon, color: Colors.white70, size: 16), const SizedBox(width: 5), Text(label, style: const TextStyle(color: Colors.white70))]),
+      const SizedBox(height: 4),
+      Text(value, style: const TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
+    ],
+  );
+
+  Widget _featureGrid() {
+    final items = [
+      _fc('findShipments', 'availableLoads', Icons.search_outlined, () => _push(BlocProvider(create: (_) => ShipmentCubit(), child: const LoadAssignmentScreen()))),
+      _fc('createShipment', 'postNewLoad', Icons.add_box_rounded, () => _push(const ShipperFormPage())),
+      _fc('myChats', 'viewConversations', Icons.chat_bubble_outline, () => _push(const AgentChatListPage())),
+      _fc('loadBoard', 'browsePostLoads', Icons.view_list_outlined, () => _push(BlocProvider(create: (_) => ShipmentCubit(), child: const allLoadsPage()))),
+      _fc('activeTrips', 'monitorLiveLocations', Icons.map_outlined, () => _push(const MyShipments())),
+      _fc('sharedtrips', 'sharedtracking', Icons.share_location, () => _push(const SharedShipmentsPage())),
+      _fc('myTrucks', 'addTrackVehicles', Icons.local_shipping_outlined, () => _push(const Mytrucks())),
+      _fc('myDrivers', 'addTrackDrivers', Icons.people_outlined, () => _push(const MyDriverPage())),
+      _fc('ratings', 'viewRatings', Icons.star_outline, () => _push(const TripRatingsPage())),
+      _fc('complaints', 'fileOrView', Icons.feedback_outlined, () => _push(const ComplaintHistoryPage())),
+      _fc('myTrips', 'historyDetails', Icons.route_outlined, () => _push(const MyTripsHistory())),
+      _fc('bilty', 'createConsignmentNote', Icons.receipt_long, () => _push(const ShipmentSelectionPage())),
+      _fc('driverDocuments', 'manageDriverRecords', Icons.person_outline, () => _push(const DriverDocumentsPage())),
+      _fc('truckDocuments', 'documents_subtitle', Icons.local_shipping_outlined, () => _push(const TruckDocumentsPage())),
+    ];
+
+    return GridView.count(
+      shrinkWrap: true,
+      crossAxisCount: 2,
+      childAspectRatio: 1.1,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      children: items,
     );
   }
+
+  FeatureCard _fc(String t, String s, IconData i, VoidCallback onTap) =>
+      FeatureCard(title: t.tr(), subtitle: s.tr(), icon: i, color: Colors.teal, onTap: onTap);
 }

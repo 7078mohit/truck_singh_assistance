@@ -25,45 +25,38 @@ class UserService {
           .from('user_profiles')
           .select('*')
           .eq('user_id', user.id)
-          .single();
-
-      return response;
+          .maybeSingle();
+      return response == null ? null : Map<String, dynamic>.from(response);
     } catch (e) {
-      print('Error fetching user profile: $e');
+      debugPrint('Error fetching user profile: $e');
       return null;
     }
   }
 
   Future<Map<String, int>> getShipmentStats(String customUserId) async {
     try {
-      // Get all shipments assigned to this user's company
       final response = await _supabase
           .from('shipment')
           .select('booking_status')
           .eq('shipper_id', customUserId);
-
-      int activeLoads = 0;
-      int completedLoads = 0;
-
-      for (var shipment in response) {
-        final status = shipment['booking_status'].toString().toLowerCase();
-        if (status == 'Completed' || status == 'Cancelled') {
-          completedLoads++;
+      int active = 0;
+      int completed = 0;
+      for (final row in response) {
+        final status = row['booking_status'].toString().toLowerCase();
+        if (status == 'completed' || status == 'cancelled') {
+          completed++;
         } else {
-          // Any status other than completed is considered active
-          activeLoads++;
+          active++;
         }
       }
-
-      return {'activeLoads': activeLoads, 'completedLoads': completedLoads};
+      return {'activeLoads': active, 'completedLoads': completed};
     } catch (e) {
-      print('Error fetching shipment stats: $e');
+      debugPrint('Error fetching shipment stats: $e');
       return {'activeLoads': 0, 'completedLoads': 0};
     }
   }
 }
 
-// Main ShipperDashboard StatefulWidget
 class ShipperDashboard extends StatefulWidget {
   const ShipperDashboard({super.key});
 
@@ -71,19 +64,14 @@ class ShipperDashboard extends StatefulWidget {
   State<ShipperDashboard> createState() => _ShipperDashboardState();
 }
 
-// THIS IS WHERE THE MAIN STATE CLASS GOES
 class _ShipperDashboardState extends State<ShipperDashboard> {
-  // Service instance
   final UserService _userService = UserService();
 
-  // State variables
   Map<String, dynamic>? userProfile;
-  Map<String, int> shipmentStats = {'activeLoads': 0, 'completedLoads': 0};
+  Map<String, int> shipmentStats = const {'activeLoads': 0, 'completedLoads': 0};
   bool isLoading = true;
   bool isLoadingStats = true;
-
-  // Static data for other metrics (you can replace these later with real data)
-  final Map<String, dynamic> staticData = {
+  final Map<String, dynamic> staticData = const {
     'totalCustomers': 48,
     'monthlyCommission': 45750.00,
     'pendingPayments': 12350.00,
@@ -98,130 +86,49 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
     initializeOneSignalAndStorePlayerId();
   }
 
-  // Load user profile from Supabase
   Future<void> _loadUserProfile() async {
     final profile = await _userService.getUserProfile();
+    if (!mounted) return;
     setState(() {
       userProfile = profile;
       isLoading = false;
     });
-
-    // Load shipment stats after getting user profile
     if (profile != null && profile['custom_user_id'] != null) {
-      _loadShipmentStats(profile['custom_user_id']);
+      await _loadShipmentStats(profile['custom_user_id']);
     }
   }
 
-  // Load shipment statistics
   Future<void> _loadShipmentStats(String customUserId) async {
     final stats = await _userService.getShipmentStats(customUserId);
+    if (!mounted) return;
     setState(() {
       shipmentStats = stats;
       isLoadingStats = false;
     });
   }
 
-  /// refresh handler
   Future<void> _handleRefresh() async {
-    await _loadUserProfile(); // reload profile
+    await _loadUserProfile();
     if (userProfile != null && userProfile!['custom_user_id'] != null) {
       await _loadShipmentStats(userProfile!['custom_user_id']);
     }
   }
 
-  // Main build method - this builds the entire screen
   @override
   Widget build(BuildContext context) {
-
-    final currentLocale = context.locale;
-
     return Scaffold(
-      //backgroundColor: const Color(0xFFF5F7FA),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // Agent Performance Overview Card
               _buildPerformanceOverviewCard(),
               const SizedBox(height: 20),
-
-              // Main Feature Grid
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 1.1,
-                children: [
-                  FeatureCard(
-                    title: 'create_shipment'.tr(),
-                    subtitle: 'post_new_load_request'.tr(),
-                    icon: Icons.add_box_rounded,
-                    color: Colors.teal,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ShipperFormPage(),
-                      ),
-                    ),
-                  ),
-                  FeatureCard(
-                    title: 'activeTrips'.tr(),
-                    subtitle: 'monitorLiveLocations'.tr(),
-                    icon: Icons.map_outlined,
-                    color: Colors.orange,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MyShipments(),
-                      ),
-                    ),
-                  ),
-                  FeatureCard(
-                    title: 'sharedtrips'.tr(),
-                    subtitle: 'sharedtracking'.tr(),
-                    icon: Icons.share_location,
-                    color: Colors.orange,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SharedShipmentsPage(),
-                      ),
-                    ),
-                  ),
-                  FeatureCard(
-                    title: 'complaints'.tr(),
-                    subtitle: 'my_complaints'.tr(),
-                    icon: Icons.feedback_outlined,
-                    color: Colors.deepOrange,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ComplaintHistoryPage(),
-                      ),
-                    ),
-                  ),
-
-                  // Invoice Card
-                  FeatureCard(
-                    title: 'invoice'.tr(),
-                    subtitle: 'request_invoice'.tr(),
-                    icon:
-                    Icons.receipt_long, // Use a relevant icon for invoices
-                    color: Colors.blue,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => MyTripsHistory()),
-                    ),
-                  ),
-                ],
-              ),
+              _buildFeatureGrid(),
               const SizedBox(height: 20),
             ],
           ),
@@ -230,24 +137,22 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
     );
   }
 
-  // AppBar with Supabase integration
   PreferredSizeWidget _buildAppBar() {
     return CustomAppBar(
       showProfile: true,
       showNotifications: true,
-      showMessages: false, // may change later
+      showMessages: false,
       userProfile: userProfile,
       isLoading: isLoading,
       onProfileTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const SettingsPage()),
+          MaterialPageRoute(builder: (_) => const SettingsPage()),
         );
       },
     );
   }
 
-  // Performance Overview Card with real shipment data
   Widget _buildPerformanceOverviewCard() {
     return Container(
       width: double.infinity,
@@ -275,7 +180,7 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
             children: [
               Text(
                 'performanceOverview'.tr(),
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -320,7 +225,10 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
               ),
               Expanded(
                 child: isLoadingStats
-                    ? _buildLoadingOverviewItem('completed'.tr(), Icons.check_circle)
+                    ? _buildLoadingOverviewItem(
+                  'completed'.tr(),
+                  Icons.check_circle,
+                )
                     : _buildOverviewItem(
                   'completed'.tr(),
                   '${shipmentStats['completedLoads']}',
@@ -334,7 +242,6 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
     );
   }
 
-  // Loading state for overview items
   Widget _buildLoadingOverviewItem(String label, IconData icon) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,10 +250,7 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
           children: [
             Icon(icon, color: Colors.white70, size: 16),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-            ),
+            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
           ],
         ),
         const SizedBox(height: 4),
@@ -362,7 +266,6 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
     );
   }
 
-  // Helper for overview items
   Widget _buildOverviewItem(String label, String value, IconData icon) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,10 +274,7 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
           children: [
             Icon(icon, color: Colors.white70, size: 16),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-            ),
+            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
           ],
         ),
         const SizedBox(height: 4),
@@ -385,6 +285,65 @@ class _ShipperDashboardState extends State<ShipperDashboard> {
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeatureGrid() {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 1.1,
+      children: [
+        FeatureCard(
+          title: 'create_shipment'.tr(),
+          subtitle: 'post_new_load_request'.tr(),
+          icon: Icons.add_box_rounded,
+          color: Colors.teal,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ShipperFormPage()),
+          ),
+        ),
+        FeatureCard(
+          title: 'activeTrips'.tr(),
+          subtitle: 'monitorLiveLocations'.tr(),
+          icon: Icons.map_outlined,
+          color: Colors.orange,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const MyShipments()),
+          ),
+        ),
+        FeatureCard(
+          title: 'sharedtrips'.tr(),
+          subtitle: 'sharedtracking'.tr(),
+          icon: Icons.share_location,
+          color: Colors.orange,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SharedShipmentsPage()),
+          ),
+        ),
+        FeatureCard(
+          title: 'complaints'.tr(),
+          subtitle: 'my_complaints'.tr(),
+          icon: Icons.feedback_outlined,
+          color: Colors.deepOrange,
+          onTap: () =>
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ComplaintHistoryPage())),
+        ),
+        FeatureCard(
+          title: 'invoice'.tr(),
+          subtitle: 'request_invoice'.tr(),
+          icon: Icons.receipt_long,
+          color: Colors.blue,
+          onTap: () =>
+              Navigator.push(context, MaterialPageRoute(builder: (_) => MyTripsHistory())),
         ),
       ],
     );

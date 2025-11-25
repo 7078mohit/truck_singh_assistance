@@ -1,7 +1,9 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 import '../config/theme.dart';
+import '../features/complains/mycomplain.dart';
 import '../widgets/common/app_bar.dart';
 import 'widgets/feature_card.dart';
 import '../features/admin/manage_shipments_page.dart';
@@ -11,14 +13,13 @@ import '../features/admin/support_ticket_list_page.dart';
 import '../features/admin/admin_user_management_page.dart';
 import '../features/settings/presentation/screen/settings_page.dart';
 
-// Admin Dashboard State
 class AdminDashboardState {
   final bool isLoading;
   final String? error;
   final Map<String, dynamic> stats;
   final Map<String, dynamic>? adminProfile;
 
-  AdminDashboardState({
+  const AdminDashboardState({
     this.isLoading = true,
     this.error,
     this.stats = const {},
@@ -39,9 +40,9 @@ class AdminDashboardState {
     );
   }
 }
-
 class AdminService {
-  final _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = Supabase.instance.client;
+
   Future<Map<String, dynamic>> getAdminProfile() async {
     final user = _supabase.auth.currentUser;
     if (user == null) throw Exception("No logged in user");
@@ -50,12 +51,14 @@ class AdminService {
         .from('user_profiles')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+
+    if (response == null) throw Exception("Profile not found");
     return response;
   }
 
-  Future<Map<String, dynamic>> getDashboardStats() async {
-    return await _supabase.rpc('get_admin_dashboard_stats');
+  Future<Map<String, dynamic>> getDashboardStats() {
+    return _supabase.rpc('get_admin_dashboard_stats');
   }
 }
 
@@ -68,7 +71,7 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   final AdminService _adminService = AdminService();
-  AdminDashboardState _state = AdminDashboardState(isLoading: true);
+  AdminDashboardState _state = const AdminDashboardState();
 
   @override
   void initState() {
@@ -76,49 +79,39 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _loadData();
   }
 
-
-  void _onLocaleChanged() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
   Future<void> _loadData() async {
     setState(() => _state = _state.copyWith(isLoading: true));
+
     try {
       final stats = await _adminService.getDashboardStats();
       final profile = await _adminService.getAdminProfile();
 
-      if (mounted) {
-        setState(() {
-          _state = _state.copyWith(
-            isLoading: false,
-            stats: stats,
-            adminProfile: profile,
-          );
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _state = _state.copyWith(
+          isLoading: false,
+          stats: stats,
+          adminProfile: profile,
+        );
+      });
     } catch (e) {
-      if (mounted) {
-        setState(
-              () => _state = _state.copyWith(isLoading: false, error: e.toString()),
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error loading data: ${e.toString()}"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      setState(() {
+        _state = _state.copyWith(isLoading: false, error: e.toString());
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error loading data: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentLocale = context.locale;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(),
@@ -129,8 +122,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  PreferredSizeWidget _buildAppBar() {
+    return CustomAppBar(
+      showProfile: true,
+      userProfile: _state.adminProfile,
+      isLoading: _state.isLoading,
+      shipment: null,
+      showMessages: false,
+      onProfileTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const SettingsPage(),
+          ),
+        );
+        if (mounted) setState(() {});
+      },
+    );
+  }
   Widget _buildBody() {
-    if (_state.isLoading) return const Center(child: CircularProgressIndicator());
+    if (_state.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     if (_state.error != null) {
       return Center(
         child: Padding(
@@ -157,24 +170,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
-    return CustomAppBar(
-      showProfile: true,
-      userProfile:
-      _state.adminProfile,
-      isLoading: _state.isLoading,
-      shipment: null,
-      showMessages: false,
-      onProfileTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const SettingsPage()),
-        );
-        if (mounted) setState(() {});
-      },
-    );
-  }
-
   Widget _buildPerformanceOverviewCard() {
     final numberFormat = NumberFormat.compact();
     return Container(
@@ -198,10 +193,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'systemOverview'.tr(),
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          Text('systemOverview'.tr(), style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -284,11 +276,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageShipmentsPage())),
         ),
         FeatureCard(
-          title: 'trucks'.tr(),
-          subtitle: 'viewallvehicles'.tr(),
-          icon: Icons.directions_bus_filled_outlined,
-          color: Colors.blueGrey,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageTrucksPage())),
+          title: 'all_complaints'.tr(),
+          subtitle: 'view_history'.tr(),
+          icon: Icons.feedback_outlined,
+          color: Colors.red,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ComplaintHistoryPage())),
         ),
       ],
     );

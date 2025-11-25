@@ -20,28 +20,24 @@ import '../features/auth/services/supabase_service.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 class CompanyDriverDb extends StatefulWidget {
-  const CompanyDriverDb({Key? key}) : super(key: key);
-
+  const CompanyDriverDb({super.key});
   @override
   State<CompanyDriverDb> createState() => _CompanyDriverDbState();
 }
 
 class _CompanyDriverDbState extends State<CompanyDriverDb> {
   final SupabaseClient supabase = Supabase.instance.client;
-  // State for User Profile
+
   Map<String, dynamic>? userProfile;
   bool isLoading = true;
-  // State for Live Tracking
+
   bool _isTrackingEnabled = false;
 
-  // State for Current Shipment
   Map<String, dynamic>? _activeShipment;
   bool _isShipmentLoading = true;
   RealtimeChannel? _shipmentChannel;
 
-  // State for Notifications
-  final RealTimeNotificationService _notificationService =
-  RealTimeNotificationService();
+  final RealTimeNotificationService _notificationService = RealTimeNotificationService();
   StreamSubscription? _notificationSubscription;
   int unreadCount = 0;
 
@@ -63,19 +59,22 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
 
   Future<void> _initializeDashboard() async {
     await BackgroundLocationService.initializeService();
-    // Services are initialized in main.dart, so we just load page data
     await _loadPageData();
-    // NEW: Initialize OneSignal after the page data is loaded
     initializeOneSignalAndStorePlayerIddriver();
   }
 
   Future<void> _loadPageData() async {
-    await Future.wait([_loadUserProfile(), _checkInitialTrackingStatus()]);
+    await Future.wait([
+      _loadUserProfile(),
+      _checkInitialTrackingStatus(),
+    ]);
   }
 
   Future<void> _handleRefresh() async {
-    // Re-fetch all the data for the dashboard
-    await Future.wait([_loadUserProfile(), _fetchUnreadCount()]);
+    await Future.wait([
+      _loadUserProfile(),
+      _fetchUnreadCount(),
+    ]);
   }
 
   Future<Map<String, dynamic>?> getUserProfile() async {
@@ -83,21 +82,21 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
       final user = supabase.auth.currentUser;
       if (user == null) return null;
 
-      final response = await supabase
+      return await supabase
           .from('user_profiles')
           .select('*')
           .eq('user_id', user.id)
           .single();
-
-      return response;
     } catch (e) {
-      print('error_fetch_user_profile: $e'.tr());
+      debugPrint('Error fetching profile: $e');
       return null;
     }
   }
 
   Future<void> _loadUserProfile() async {
     final profile = await getUserProfile();
+
+    if (!mounted) return;
     setState(() {
       userProfile = profile;
       isLoading = false;
@@ -110,11 +109,10 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
 
   void _startNotificationListener(String userId) {
     _notificationService.startListening(userId);
-    _notificationSubscription = _notificationService.notificationStream.listen((
-        _,
-        ) {
-      _fetchUnreadCount();
-    });
+    _notificationSubscription =
+        _notificationService.notificationStream.listen((_) {
+          _fetchUnreadCount();
+        });
     _fetchUnreadCount();
   }
 
@@ -122,54 +120,52 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
     try {
       final user = SupabaseService.getCurrentUser();
       if (user == null) return;
+
       final count = await SupabaseService.client
           .from('notifications')
           .count(CountOption.exact)
           .eq('user_id', user.id)
           .eq('read', false);
 
-      if (mounted) {
-        setState(() => unreadCount = count);
-      }
+      if (!mounted) return;
+      setState(() => unreadCount = count);
     } catch (e) {
-      print("error_fetch_unread_notification $e".tr());
+      debugPrint("Error loading notification count: $e");
     }
   }
 
   Future<void> _fetchActiveShipment() async {
     final userCustomId = userProfile?['custom_user_id'];
     if (userCustomId == null) {
-      if (mounted) setState(() => _isShipmentLoading = false);
+      if (!mounted) return;
+      setState(() => _isShipmentLoading = false);
       return;
     }
-    if (!_isShipmentLoading) setState(() => _isShipmentLoading = true);
+
     try {
       final response = await SupabaseService.client
-          .from('shipment'.tr())
+          .from('shipment')
           .select()
           .eq('assigned_driver', userCustomId)
-      // FIXED: Use the correct filter syntax for your package version
           .filter('booking_status', 'in', [
-        'accepted'.tr(),
-        'en_route_to_pickup'.tr(),
-        'arrived_at_pickup'.tr(),
-        'in_transit'.tr(),
+        'accepted',
+        'en_route_to_pickup',
+        'arrived_at_pickup',
+        'in_transit',
       ])
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
 
-      if (mounted) {
-        setState(() {
-          _activeShipment = response;
-          _isShipmentLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isShipmentLoading = false);
-        _showErrorSnackBar("error_fetch_active_shipment".tr());
-      }
+      if (!mounted) return;
+      setState(() {
+        _activeShipment = response;
+        _isShipmentLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isShipmentLoading = false);
+      _showErrorSnackBar("error_fetch_active_shipment".tr());
     }
   }
 
@@ -188,10 +184,7 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
         column: 'assigned_driver',
         value: userCustomId,
       ),
-      callback: (payload) {
-        print("shipment_change_refetching".tr());
-        _fetchActiveShipment();
-      },
+      callback: (_) => _fetchActiveShipment(),
     )
         .subscribe();
   }
@@ -199,264 +192,85 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
   Future<void> _checkInitialTrackingStatus() async {
     final service = FlutterBackgroundService();
     final isRunning = await service.isRunning();
-    if (mounted) {
-      setState(() => _isTrackingEnabled = isRunning);
-    }
+    if (!mounted) return;
+    setState(() => _isTrackingEnabled = isRunning);
   }
 
   Future<void> _toggleTracking(bool value) async {
     if (value) {
-      final hasPermission = await _handleLocationPermission();
-      if (!hasPermission) return;
+      final allowed = await _handleLocationPermission();
+      if (!allowed) return;
       await BackgroundLocationService.startService();
       _showSnackBar("tracking_service_started".tr());
     } else {
       BackgroundLocationService.stopService();
       _showSnackBar("tracking_service_stopped".tr());
     }
-    if (mounted) {
-      setState(() => _isTrackingEnabled = value);
-    }
+
+    if (!mounted) return;
+    setState(() => _isTrackingEnabled = value);
   }
 
   Future<bool> _handleLocationPermission() async {
-    // 1. Request Notification permission FIRST.
     if (await handler.Permission.notification.request().isDenied) {
       _showErrorSnackBar("error_notification_permission_required".tr());
       return false;
     }
-    // 2. Check if the device's location services are enabled.
+
     if (await handler.Permission.location.serviceStatus.isDisabled) {
       _showErrorSnackBar("error_enable_location_services".tr());
-      await handler.openAppSettings();
+      handler.openAppSettings();
       return false;
     }
 
-    // 3. Request "While in Use" location permission.
-    var status = await handler.Permission.location.request();
-    if (status.isDenied || status.isPermanentlyDenied) {
+    if (await handler.Permission.location.request().isDenied) {
       _showErrorSnackBar("error_location_permission_required".tr());
-      await handler.openAppSettings();
+      handler.openAppSettings();
       return false;
     }
 
-    // 4. Request "Always" location permission for background tracking.
     if (await handler.Permission.locationAlways.isDenied) {
-      if (mounted) {
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text("background_location_required_title".tr()),
-            content: Text("background_location_required_message".tr()),
-            actions: [
-              TextButton(
-                child: Text("cancel".tr()),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              TextButton(
-                child: Text("go_to_settings".tr()),
-                onPressed: () {
-                  handler.openAppSettings();
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          ),
-        );
-      }
       return false;
     }
 
-    // 5. If we reach here, all permissions are granted.
     return true;
   }
 
   void _showSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
   }
 
   void _showErrorSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.redAccent,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.redAccent,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentLocale = context.locale;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _handleRefresh,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: Column(
-                      children: [
-                        _buildCurrentTripCard(),
-                        const SizedBox(height: 20),
-                        GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 1.1,
-                          children: [
-                            _buildFeatureCard(
-                              title: 'shipments_title'.tr(),
-                              subtitle: 'shipments_subtitle'.tr(),
-                              icon: Icons.local_shipping_outlined,
-                              color: AppColors.orange,
-                              onTap: () {
-                                final userCustomId =
-                                userProfile?['custom_user_id'];
-                                if (userCustomId != null) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => DriverStatusChanger(
-                                        driverId: userCustomId,
-                                      ),
-                                    ),
-                                  );
-                                } else {
-                                  _showErrorSnackBar(
-                                    "driver_id_not_loaded".tr(),
-                                  );
-                                }
-                              },
-                            ),
-                            _buildFeatureCard(
-                              title: 'my_trips_title'.tr(),
-                              subtitle: 'my_trips_subtitle'.tr(),
-                              icon: Icons.route_outlined,
-                              color: Colors.blue,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                    const MyTripsHistory(),
-                                  ),
-                                );
-                              },
-                            ),
-                            _buildFeatureCard(
-                              title: 'My Documents',
-                              subtitle: 'Upload personal documents',
-                              icon: Icons.person_outline,
-                              color: Colors.green,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                    const DriverDocumentsPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                            _buildFeatureCard(
-                              title: 'Truck Documents',
-                              subtitle: 'View truck documents (when assigned)',
-                              icon: Icons.local_shipping_outlined,
-                              color: Colors.blue,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                    const TruckDocumentsPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                            _buildFeatureCard(
-                              title: 'complaints_title'.tr(),
-                              subtitle: 'complaints_subtitle'.tr(),
-                              icon: Icons.report_problem_outlined,
-                              color: Colors.amber,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                    const ComplaintHistoryPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                            _buildFeatureCard(
-                              title: 'sos_title'.tr(),
-                              subtitle: 'sos_subtitle'.tr(),
-                              icon: Icons.sos_outlined,
-                              color: Colors.red,
-                              onTap: () {
-                                // --- START CORRECT CODE ---
-                                // Check if there's an active shipment loaded
-                                if (_activeShipment == null) {
-                                  _showErrorSnackBar("You are not on an active shipment."); // Correct error message
-                                  return;
-                                }
-                                // Get the AGENT ID from the active shipment
-                                final agentId = _activeShipment!['assigned_agent'];
-
-                                if (agentId != null && agentId.isNotEmpty) {
-                                  // Navigate and pass the AGENT ID
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => CompanyDriverEmergencyScreen(
-                                        agentId: agentId, // Pass agentId now
-                                      ),
-                                    ),
-                                  );
-                                } else {
-                                  // Show error if no agent is assigned to the shipment
-                                  _showErrorSnackBar("No agent assigned to the current shipment."); // Correct error message
-                                }
-                                // --- END CORRECT CODE ---
-                              },
-                            ),
-                            _buildFeatureCard(
-                              title: 'My Chats',
-                              subtitle: 'View your Chats',
-                              icon: Icons.chat_bubble_outline,
-                              color: Colors.blue,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                    const DriverChatListPage()),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildCurrentTripCard(),
+                const SizedBox(height: 20),
+                _buildFeatureGrid(),
+              ],
             ),
           ),
         ),
@@ -466,9 +280,9 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
 
   Widget _buildCurrentTripCard() {
     if (_isShipmentLoading) {
-      return SizedBox(
+      return const SizedBox(
         height: 150,
-        child: const Center(child: CircularProgressIndicator()),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -484,9 +298,10 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
         child: Center(
           child: Text(
             "no_active_trip".tr(),
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(color: Colors.grey.shade500),
+            style: Theme.of(context)
+                .textTheme
+                .headlineMedium
+                ?.copyWith(color: Colors.grey.shade500),
           ),
         ),
       );
@@ -515,18 +330,15 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.radio_button_checked,
-                color: Colors.white,
-                size: 16,
-              ),
+              const Icon(Icons.radio_button_checked,
+                  color: Colors.white, size: 16),
               const SizedBox(width: 8),
               Text(
                 'live_tracking'.tr(),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: Colors.white),
               ),
               const Spacer(),
               Switch(
@@ -534,25 +346,22 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
                 onChanged: _toggleTracking,
                 activeTrackColor: AppColors.orange.withOpacity(0.5),
                 activeColor: Colors.white,
-                inactiveThumbColor: Colors.white60,
-                inactiveTrackColor: Colors.black26,
               ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
-            '${_activeShipment!['pickup'] ?? 'Origin'} → ${_activeShipment!['drop'] ?? 'Destination'}',
+            '${_activeShipment!['pickup']} → ${_activeShipment!['drop']}',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+                color: Colors.white, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           Text(
-            'ID: ${_activeShipment!['shipment_id'] ?? 'N/A'} • Status: ${_activeShipment!['booking_status'] ?? 'N/A'}',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+            'ID: ${_activeShipment!['shipment_id']} • Status: ${_activeShipment!['booking_status']}',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: Colors.white70),
           ),
         ],
       ),
@@ -563,16 +372,130 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
     return CustomAppBar(
       showProfile: true,
       showNotifications: true,
-      showMessages: true, // may change later
+      showMessages: true,
       userProfile: userProfile,
       isLoading: isLoading,
       shipment: _activeShipment,
       onProfileTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => SettingsPage()),
+          MaterialPageRoute(builder: (context) => const SettingsPage()),
         );
       },
+    );
+  }
+
+  Widget _buildFeatureGrid() {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 1.1,
+      children: [
+        _buildFeatureCard(
+          title: 'shipments_title'.tr(),
+          subtitle: 'shipments_subtitle'.tr(),
+          icon: Icons.local_shipping_outlined,
+          color: AppColors.orange,
+          onTap: () {
+            final userCustomId = userProfile?['custom_user_id'];
+            if (userCustomId != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DriverStatusChanger(driverId: userCustomId),
+                ),
+              );
+            } else {
+              _showErrorSnackBar("driver_id_not_loaded".tr());
+            }
+          },
+        ),
+        _buildFeatureCard(
+          title: 'my_trips_title'.tr(),
+          subtitle: 'my_trips_subtitle'.tr(),
+          icon: Icons.route_outlined,
+          color: Colors.blue,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyTripsHistory()),
+            );
+          },
+        ),
+        _buildFeatureCard(
+          title: 'My Documents',
+          subtitle: 'Upload personal documents',
+          icon: Icons.person_outline,
+          color: Colors.green,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DriverDocumentsPage()),
+            );
+          },
+        ),
+        _buildFeatureCard(
+          title: 'Truck Documents',
+          subtitle: 'View truck documents (when assigned)',
+          icon: Icons.local_shipping_outlined,
+          color: Colors.blue,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TruckDocumentsPage()),
+            );
+          },
+        ),
+        _buildFeatureCard(
+          title: 'complaints_title'.tr(),
+          subtitle: 'complaints_subtitle'.tr(),
+          icon: Icons.report_problem_outlined,
+          color: Colors.amber,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ComplaintHistoryPage()),
+            );
+          },
+        ),
+        _buildFeatureCard(
+          title: 'sos_title'.tr(),
+          subtitle: 'sos_subtitle'.tr(),
+          icon: Icons.sos_outlined,
+          color: Colors.red,
+          onTap: () {
+            if (_activeShipment == null) {
+              _showErrorSnackBar("You are not on an active shipment.");
+              return;
+            }
+            final agentId = _activeShipment!['assigned_agent'];
+            if (agentId != null && agentId.toString().isNotEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      CompanyDriverEmergencyScreen(agentId: agentId),
+                ),
+              );
+            } else {
+              _showErrorSnackBar("No agent assigned to the current shipment.");
+            }
+          },
+        ),
+        _buildFeatureCard(
+          title: 'My Chats',
+          subtitle: 'View your Chats',
+          icon: Icons.chat_bubble_outline,
+          color: Colors.blue,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DriverChatListPage()),
+          ),
+        ),
+      ],
     );
   }
 
@@ -614,9 +537,10 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
               const SizedBox(height: 16),
               Text(
                 title,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyLarge
+                    ?.copyWith(fontWeight: FontWeight.w600),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 4),
