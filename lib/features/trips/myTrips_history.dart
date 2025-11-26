@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:logistics_toolkit/features/trips/shipment_details.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart' as ptr;
 import 'package:path_provider/path_provider.dart';
@@ -45,20 +44,16 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
   );
 
   SharedPreferences? _prefs;
-  final MytripsServices _supabaseService = MytripsServices();
+  final MyTripsServices _supabaseService = MyTripsServices();
 
   // PDF-related state and controllers
   Map<String, PdfState> pdfStates = {};
-  final TextEditingController _priceeController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
   final TextEditingController _companyNameController = TextEditingController();
-  final TextEditingController _companyAddressController =
-  TextEditingController();
   final TextEditingController _cMobileNumberController =
   TextEditingController();
-  final TextEditingController _billtoNameController = TextEditingController();
-  final TextEditingController _billtoAddressController =
-  TextEditingController();
-  final TextEditingController _billtoMobileNumberController =
+  final TextEditingController _billToNameController = TextEditingController();
+  final TextEditingController _billToMobileNumberController =
   TextEditingController();
   final TextEditingController _invoiceNumberController =
   TextEditingController();
@@ -80,6 +75,8 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
 
   BillingAddress? _fetchedBillingAddress;
   CompanyAddress? _selectedCompanyAddress;
+  List<String> _sortedMonths = [];
+  Map<String, List<Map<String, dynamic>>> _groupedShipments = {};
 
   @override
   void initState() {
@@ -163,6 +160,7 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
       setState(() {
         shipments = List<Map<String, dynamic>>.from(jsonDecode(cachedData));
         filteredShipments = shipments;
+        _processShipmentData();
         loading = false;
       });
     }
@@ -223,11 +221,34 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
     await _prefs?.setString('shipments_cache', jsonEncode(shipments));
     await fetchEditCounts();
     await checkPdfStates();
+    _processShipmentData();
 
     setState(() {
       loading = false;
       _refreshController.refreshCompleted();
     });
+  }
+
+  void _processShipmentData() {
+    _groupedShipments = groupShipmentsByMonth(filteredShipments);
+
+    _sortedMonths = _groupedShipments.keys.toList()
+      ..sort((a, b) {
+        try {
+          final da = DateFormat.yMMMM().parse(a);
+          final db = DateFormat.yMMMM().parse(b);
+          return db.compareTo(da);
+        } catch (e) {
+          return 0;
+        }
+      });
+
+    // Default selection logic
+    if (selectedMonth == null && _sortedMonths.isNotEmpty) {
+      selectedMonth = _sortedMonths.first;
+    } else if (selectedMonth != null && !_sortedMonths.contains(selectedMonth)) {
+      selectedMonth = _sortedMonths.isNotEmpty ? _sortedMonths.first : null;
+    }
   }
 
   void searchShipments(String query) {
@@ -496,7 +517,7 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
                       decoration: BoxDecoration(
                         color: Theme.of(
                           context,
-                        ).colorScheme.primary.withOpacity(0.1),
+                        ).colorScheme.primary.withValues(alpha: 0.1),
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(20),
                         ),
@@ -622,16 +643,16 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
 
     final invoiceUrl = await generateInvoicePDF(
       shipment: shipment,
-      price: _priceeController.text,
+      price: _priceController.text,
       companyName: _companyNameController.text,
       companyAddress: _selectedCompanyAddress != null
           ? '${_selectedCompanyAddress!.flatNo}, ${_selectedCompanyAddress!.streetName}, ${_selectedCompanyAddress!.cityName}, ${_selectedCompanyAddress!.district}, ${_selectedCompanyAddress!.zipCode}'
           : '',
       companyMobile: _cMobileNumberController.text,
-      customerName: _billtoNameController.text,
+      customerName: _billToNameController.text,
       customerAddress: '',
       billingAddress: _fetchedBillingAddress,
-      customerMobile: _billtoMobileNumberController.text,
+      customerMobile: _billToMobileNumberController.text,
       invoiceNo: _invoiceNumberController.text,
       companySelectedAddress: _selectedCompanyAddress,
       bankName: _bankNameController.text,
@@ -713,13 +734,12 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
       return;
     }
 
-    print("Attempting to download from URL: $pdfUrl"); // Debug print
+    print("Attempting to download from URL: $pdfUrl");
 
     try {
       final response = await http.get(Uri.parse(pdfUrl));
 
-      print("Download response status code: ${response.statusCode}"); // Debug print
-
+      print("Download response status code: ${response.statusCode}");
       if (response.statusCode == 200) {
         final appDir = await getApplicationDocumentsDirectory();
         final localPath = '${appDir.path}/$shipmentId.pdf';
@@ -750,14 +770,12 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
     }
   }
 
-  // --- THIS IS THE UPDATED FUNCTION ---
   void previewInvoice(BuildContext context, String shipmentId) async {
     final appDir = await getApplicationDocumentsDirectory();
     final localPath = '${appDir.path}/$shipmentId.pdf';
     final file = File(localPath);
 
     if (await file.exists()) {
-      // File exists, open it
       if (!mounted) return;
       Navigator.push(
         context,
@@ -766,16 +784,13 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
         ),
       );
     } else {
-      // File doesn't exist, try to download it
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('PDF not found, re-downloading...')),
       );
-
-      // Find the shipment map
       final shipment = shipments.firstWhere(
             (s) => s['shipment_id'] == shipmentId,
-        orElse: () => <String, dynamic>{}, // Return empty map if not found
+        orElse: () => <String, dynamic>{},
       );
 
       if (shipment.isEmpty) {
@@ -786,10 +801,7 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
         return;
       }
 
-      // Call download function
       await downloadInvoice(shipment);
-
-      // Check again if file exists after download
       if (await file.exists()) {
         if (!mounted) return;
         Navigator.push(
@@ -799,7 +811,6 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
           ),
         );
       } else {
-        // If it still fails, show the final error
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('PDF download failed.')),
@@ -807,11 +818,9 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
       }
     }
   }
-  // --- END OF UPDATED FUNCTION ---
 
   Future<void> confirmAndDelete(BuildContext context, Map<String, dynamic> shipment) async {
     final shipmentId = shipment['shipment_id'].toString();
-    // Show confirmation dialog
     if (!mounted) return;
     final result = await showDialog<bool>(
       context: context,
@@ -834,39 +843,26 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
     if (result != true) return;
 
     try {
-      // Get the path from the shipment data
       final pdfPath = shipment['Invoice_link'] as String?;
       if (pdfPath == null || pdfPath.isEmpty) {
         throw Exception('Invoice link not found in shipment data');
       }
 
-      // --- THIS IS THE FIX ---
-      // We must extract the relative path from the full URL to delete from storage
-      // Full URL: https://[...].supabase.co/storage/v1/object/public/invoices/TRUK1147/SHP-001.pdf
-      // Relative Path: TRUK1147/SHP-001.pdf
       final bucketPath = pdfPath.split('/invoices/').last;
-
-      // Delete PDF from Supabase bucket using the relative path
       await Supabase.instance.client.storage
           .from('invoices')
           .remove([bucketPath]);
-      // --- END OF FIX ---
 
-      // Delete local PDF file
       final appDir = await getApplicationDocumentsDirectory();
       final localPath = '${appDir.path}/$shipmentId.pdf';
       final file = File(localPath);
       if (await file.exists()) {
         await file.delete();
       }
-
-      // Update Supabase to clear invoice link and status
       await Supabase.instance.client
           .from('shipment')
           .update({'Invoice_link': null})
           .eq('shipment_id', shipmentId);
-
-      // Update local shipment map and UI button state
       shipment['Invoice_link'] = null;
       shipment['hasInvoice'] = false;
       if (mounted) {
@@ -903,7 +899,7 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
   }
 
   void requestInvoice(Map<String, dynamic> shipment) async {
-    final companyId = shipment['assigned_agent']; // Use assigned_agent
+    final companyId = shipment['assigned_agent'];
     if (companyId == null) {
       print("Cannot request invoice: assigned_agent is null");
       if (!mounted) return;
@@ -927,26 +923,19 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
       await Supabase.instance.client.from('invoice_requests').insert({
         'shipment_id': shipment['shipment_id'],
         'requested_by': customUserId,
-        'requested_to': companyId, // Use assigned_agent
+        'requested_to': companyId,
       }).select();
-
       print("Invoice request logged in Supabase ✅: $response");
-
-      // --- NEW: SEND NOTIFICATION TO AGENT/OWNER ---
       try {
         await _sendInvoiceRequestNotification(shipment);
       } catch (e) {
         print("Error sending 'invoice request' notification: $e");
       }
-      // --- END NEW ---
-
-      // --- NEW: Update UI immediately ---
       if (mounted) {
         setState(() {
           _invoiceRequests.add(shipment['shipment_id']);
         });
       }
-      // --- END NEW ---
     } catch (e) {
       print("Exception while requesting invoice: $e");
     }
@@ -954,9 +943,6 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
 
   Future shareInvoice(Map shipment) async {
     final shipmentId = shipment['shipment_id'].toString();
-
-    // --- THIS IS THE FIX ---
-    // The 'Invoice_link' is the FULL public URL.
     final publicUrl = shipment['Invoice_link'] as String?;
 
     if (publicUrl == null || publicUrl.isEmpty) {
@@ -966,13 +952,18 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
       ).showSnackBar(SnackBar(content: Text('pdf_link_not_found'.tr())));
       return;
     }
-    // --- END OF FIX ---
 
     try {
-      // Share the public URL
-      await Share.share(
-          'Here is the invoice for shipment $shipmentId: $publicUrl',
-          subject: 'Invoice for $shipmentId');
+      final box = context.findRenderObject() as RenderBox?;
+
+      await SharePlus.instance.share(
+          ShareParams(
+            text:'Here is the invoice for shipment $shipmentId: $publicUrl',
+            subject: 'Invoice for $shipmentId',
+            sharePositionOrigin: box != null
+                ? box.localToGlobal(Offset.zero) & box.size
+                : null,)
+      );
 
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -986,15 +977,11 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
     }
   }
 
-  // --- NEW NOTIFICATION HELPER FUNCTIONS ---
-
-  /// Sends a notification to the assigned agent/owner
   Future<void> _sendInvoiceRequestNotification(Map<String, dynamic> shipment) async {
     final assignedAgentId = shipment['assigned_agent'] as String?;
     if (assignedAgentId == null) return;
 
     final shipmentId = shipment['shipment_id'];
-    // Try to get shipper name, default to 'A shipper'
     final shipperProfile = await Supabase.instance.client
         .from('user_profiles')
         .select('name')
@@ -1009,7 +996,6 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
     );
   }
 
-  /// Sends a notification to the original shipper
   Future<void> _sendInvoiceGeneratedNotification(Map<String, dynamic> shipment) async {
     final shipperId = shipment['shipper_id'] as String?;
     if (shipperId == null) return;
@@ -1023,10 +1009,8 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
     );
   }
 
-  /// Calls your Supabase RPC function to send the push notification
   Future<void> _sendNotification(String receiverCustomId, String title, String message) async {
     try {
-      // Using the 'send-user-notification' function from your screenshot
       await Supabase.instance.client.rpc('send-user-notification', params: {
         'receiver_id': receiverCustomId,
         'title': title,
@@ -1037,8 +1021,6 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
       print("Error calling RPC 'send-user-notification': $e");
     }
   }
-
-  // --- END NEW NOTIFICATION FUNCTIONS ---
 
   Widget _buildTextField({
     required TextEditingController controller,
@@ -1057,14 +1039,11 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
           labelText: label,
           prefixIcon: icon != null ? Icon(icon) : null,
           filled: true,
-          //fillColor: Colors.grey.shade100,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            //borderSide: BorderSide(color: Colors.grey.shade400),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            //borderSide: BorderSide(color: Colors.grey.shade300),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -1077,737 +1056,412 @@ class _MyTripsHistoryPageState extends State<MyTripsHistory> {
       ),
     );
   }
-  // --------- INTEGRATED INVOICE FUNCTIONS END ----------
 
   @override
   Widget build(BuildContext context) {
-    final groupedShipments = groupShipmentsByMonth(filteredShipments);
-    final months = groupedShipments.keys.toList()
-      ..sort((a, b) {
-        final da = DateFormat.yMMMM().parse(a);
-        final db = DateFormat.yMMMM().parse(b);
-        return db.compareTo(da);
-      });
-
-    if (selectedMonth == null && months.isNotEmpty) {
-      selectedMonth = months.first;
+    if (_sortedMonths.isEmpty && filteredShipments.isNotEmpty) {
+      _processShipmentData();
     }
 
-    return StatefulBuilder(
-      builder: (context, setState) {
-        // Handle case where selectedMonth might not exist in keys yet
-        final shipmentsToShow = groupedShipments[selectedMonth] ?? [];
-        return Scaffold(
-          appBar: AppBar(
-            title: Text('shipment_history'.tr()),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.search),
-                onPressed: () async {
-                  final result = await showSearch(
-                    context: context,
-                    delegate: ShipmentSearchDelegate(shipments: shipments),
-                  );
-                  if (result != null) searchShipments(result);
-                },
-              ),
-            ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('shipment_history'.tr()),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () async {
+              final result = await showSearch(
+                context: context,
+                delegate: ShipmentSearchDelegate(shipments: shipments),
+              );
+              if (result != null) searchShipments(result);
+            },
           ),
-          body: RefreshIndicator(
-            onRefresh: fetchShipments,
-            child: loading
-                ? buildSkeletonLoader()
-                : filteredShipments.isEmpty
-                ? buildEmptyState()
-                : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: "select_month".tr(),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedMonth,
-                        isExpanded: true,
-                        hint: Text("choose_month".tr()),
-                        icon: const Icon(
-                          Icons.calendar_month,
-                          color: Colors.blue,
-                        ),
-                        onChanged: (value) {
-                          setState(() => selectedMonth = value);
-                        },
-                        items: months.map((m) {
-                          final label = getMonthLabel(m);
-                          return DropdownMenuItem(
-                            value: m,
-                            child: Text(label),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ),
-                const Divider(thickness: 1),
-                Expanded(
-                  child: shipmentsToShow.isEmpty
-                      ? Center(
-                    child: Text(
-                      "No shipments in $selectedMonth",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  )
-                      : ListView.builder(
-                    itemCount: shipmentsToShow.length,
-                    itemBuilder: (_, i) {
-                      final shipment = shipmentsToShow[i];
-                      final shipmentId =
-                      shipment['shipment_id'].toString();
-                      final isRequested =
-                      _invoiceRequests.contains(shipmentId);
-
-                      return shipment_card.ShipmentCard(
-                        shipment: shipment,
-                        pdfStates: pdfStates,
-                        isInvoiceRequested: isRequested,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  ShipmentDetailsPage(
-                                    shipment: shipment,
-                                    isHistoryPage: true,
-                                  ),
-                            ),
-                          );
-                          print(
-                            "Building card for shipment ID: ${shipment['shipment_id']}, pdfState: $pdfStates",
-                          );
-                        },
-                        onPreviewInvoice: () {
-                          previewInvoice(
-                            context,
-                            shipment['shipment_id'].toString(),
-                          );
-                        },
-                        // if (pdfState == PdfState.uploaded)
-                        onDownloadInvoice: () async {
-                          await downloadInvoice(shipment);
-
-                          // Update state to "downloaded"
-                          if (mounted) {
-                            setState(() {
-                              pdfStates[shipment['shipment_id']
-                                  .toString()] =
-                                  PdfState.downloaded;
-                            });
-                          }
-                        },
-
-                        onRequestInvoice: () {
-                          requestInvoice(shipment);
-                        },
-                        onGenerateInvoice: () async {
-                          await fetchBankAndGst(); // fetch bank + gst before showing dialog
-                          final shipperId = shipment['shipper_id']
-                              ?.toString();
-                          if (shipperId != null) {
-                            final customerInfo =
-                            await fetchCustomerNameAndMobile(
-                              shipperId,
-                            );
-
-                            // Set controllers before showing the dialog
-                            _billtoNameController.text =
-                                customerInfo['name'] ?? '';
-                            _billtoMobileNumberController.text =
-                                customerInfo['mobile_number'] ?? '';
-                          }
-                          if (!mounted) return;
-                          await showDialog(
-                            context: context,
-                            builder: (_) => StatefulBuilder(
-                              builder: (context, setState) {
-                                void _recalculateTotals() {
-                                  final price =
-                                      double.tryParse(
-                                        _priceeController.text,
-                                      ) ??
-                                          0.0;
-                                  final taxPercent =
-                                      double.tryParse(
-                                        _taxPercentageController
-                                            .text,
-                                      ) ??
-                                          0.0;
-
-                                  if (taxPercent <= 0 ||
-                                      price <= 0) {
-                                    setState(() {
-                                      _calculatedTax = 0.0;
-                                      _calculatedTotal = price;
-                                    });
-                                    return;
-                                  }
-
-                                  _calculatedTax =
-                                      (price * taxPercent) / 100;
-                                  _calculatedTotal =
-                                      price + _calculatedTax;
-
-                                  setState(() {});
-                                }
-
-                                return Dialog(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                    BorderRadius.circular(20),
-                                  ),
-                                  child: ConstrainedBox(
-                                    constraints:
-                                    const BoxConstraints(
-                                      maxWidth: 450,
-                                      maxHeight: 600,
-                                    ),
-                                    child: Column(
-                                      mainAxisSize:
-                                      MainAxisSize.min,
-                                      children: [
-                                        // Title Bar
-                                        Container(
-                                          width: double.infinity,
-                                          padding:
-                                          const EdgeInsets.all(
-                                            16,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .primary
-                                                .withOpacity(0.1),
-                                            borderRadius:
-                                            const BorderRadius.vertical(
-                                              top:
-                                              Radius.circular(
-                                                20,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.receipt_long,
-                                                color:
-                                                Theme.of(
-                                                  context,
-                                                )
-                                                    .colorScheme
-                                                    .primary,
-                                              ),
-                                              const SizedBox(
-                                                width: 8,
-                                              ),
-                                              Text(
-                                                "invoice_details"
-                                                    .tr(),
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .titleLarge
-                                                    ?.copyWith(
-                                                  fontWeight:
-                                                  FontWeight
-                                                      .bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-
-                                        // Form content
-                                        Expanded(
-                                          child: SingleChildScrollView(
-                                            padding:
-                                            const EdgeInsets.all(
-                                              16,
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                              CrossAxisAlignment
-                                                  .start,
-                                              children: [
-                                                // Company Info
-                                                Text(
-                                                  "company_information"
-                                                      .tr(),
-                                                  style: TextStyle(
-                                                    fontWeight:
-                                                    FontWeight
-                                                        .bold,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                                const Divider(),
-                                                const SizedBox(
-                                                  height: 8,
-                                                ),
-                                                _buildTextField(
-                                                  controller:
-                                                  _companyNameController,
-                                                  label:
-                                                  "company_name"
-                                                      .tr(),
-                                                  icon: Icons
-                                                      .business,
-                                                ),
-                                                _buildTextField(
-                                                  controller:
-                                                  _cMobileNumberController,
-                                                  label:
-                                                  "company_mobile_no"
-                                                      .tr(),
-                                                  keyboard:
-                                                  TextInputType
-                                                      .phone,
-                                                  icon: Icons.phone,
-                                                ),
-                                                _buildTextField(
-                                                  controller:
-                                                  _gstController,
-                                                  label:
-                                                  "gst_number"
-                                                      .tr(),
-                                                  icon: Icons
-                                                      .assignment_outlined,
-                                                ),
-
-                                                const SizedBox(
-                                                  height: 16,
-                                                ),
-
-                                                // --- Bank Info ---
-                                                Text(
-                                                  "bank_details"
-                                                      .tr(),
-                                                  style: TextStyle(
-                                                    fontWeight:
-                                                    FontWeight
-                                                        .bold,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                                const Divider(),
-                                                _buildTextField(
-                                                  controller:
-                                                  _bankNameController,
-                                                  label: "bank_name"
-                                                      .tr(),
-                                                  icon: Icons
-                                                      .account_balance,
-                                                ),
-                                                _buildTextField(
-                                                  controller:
-                                                  _accountNumberController,
-                                                  label:
-                                                  "account_number"
-                                                      .tr(),
-                                                  keyboard:
-                                                  TextInputType
-                                                      .number,
-                                                  icon: Icons
-                                                      .credit_card,
-                                                ),
-                                                _buildTextField(
-                                                  controller:
-                                                  _ifscController,
-                                                  label: "ifsc_code"
-                                                      .tr(),
-                                                  icon: Icons
-                                                      .qr_code_2,
-                                                ),
-                                                _buildTextField(
-                                                  controller:
-                                                  _branchController,
-                                                  label: "branch"
-                                                      .tr(),
-                                                  icon: Icons
-                                                      .location_city_outlined,
-                                                ),
-                                                _buildTextField(
-                                                  controller:
-                                                  _accountHolderController,
-                                                  label:
-                                                  "account_holder_name"
-                                                      .tr(),
-                                                  icon:
-                                                  Icons.person,
-                                                ),
-
-                                                const SizedBox(
-                                                  height: 16,
-                                                ),
-
-                                                // --- Customer Info ---
-                                                Text(
-                                                  "customer_information"
-                                                      .tr(),
-                                                  style: TextStyle(
-                                                    fontWeight:
-                                                    FontWeight
-                                                        .bold,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                                const Divider(),
-                                                _buildTextField(
-                                                  controller:
-                                                  _billtoNameController,
-                                                  label:
-                                                  "customer_name"
-                                                      .tr(),
-                                                  icon: Icons
-                                                      .person_outline,
-                                                ),
-                                                _buildTextField(
-                                                  controller:
-                                                  _billtoMobileNumberController,
-                                                  label:
-                                                  "customer_mobile_no"
-                                                      .tr(),
-                                                  keyboard:
-                                                  TextInputType
-                                                      .phone,
-                                                  icon: Icons
-                                                      .phone_android,
-                                                ),
-
-                                                const SizedBox(
-                                                  height: 16,
-                                                ),
-
-                                                // --- Invoice ---
-                                                _buildTextField(
-                                                  controller:
-                                                  _invoiceNumberController,
-                                                  label:
-                                                  "invoice_no"
-                                                      .tr(),
-                                                  icon:
-                                                  Icons.receipt,
-                                                ),
-                                                _buildTextField(
-                                                  controller:
-                                                  _priceeController,
-                                                  label: "price"
-                                                      .tr(),
-                                                  keyboard:
-                                                  const TextInputType.numberWithOptions(
-                                                    decimal:
-                                                    true,
-                                                  ),
-                                                  icon: Icons
-                                                      .currency_rupee,
-                                                  onChanged: (_) =>
-                                                      _recalculateTotals(),
-                                                ),
-
-                                                const SizedBox(
-                                                  height: 16,
-                                                ),
-
-                                                // --- Tax Details ---
-                                                Text(
-                                                  "tax_details"
-                                                      .tr(),
-                                                  style: TextStyle(
-                                                    fontWeight:
-                                                    FontWeight
-                                                        .bold,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                                const Divider(),
-                                                _buildTextField(
-                                                  controller:
-                                                  _taxPercentageController,
-                                                  label:
-                                                  "tax_percentage"
-                                                      .tr(),
-                                                  keyboard:
-                                                  const TextInputType.numberWithOptions(
-                                                    decimal:
-                                                    true,
-                                                  ),
-                                                  icon:
-                                                  Icons.percent,
-                                                  onChanged: (_) =>
-                                                      _recalculateTotals(),
-                                                ),
-
-                                                RadioListTile<
-                                                    TaxType
-                                                >(
-                                                  title: Text(
-                                                    "within_state"
-                                                        .tr(),
-                                                  ),
-                                                  value: TaxType
-                                                      .withinState,
-                                                  groupValue:
-                                                  _selectedTaxType,
-                                                  onChanged: (val) {
-                                                    setState(() {
-                                                      _selectedTaxType =
-                                                      val!;
-                                                      _recalculateTotals();
-                                                    });
-                                                  },
-                                                ),
-                                                RadioListTile<
-                                                    TaxType
-                                                >(
-                                                  title: Text(
-                                                    "outside_state"
-                                                        .tr(),
-                                                  ),
-                                                  value: TaxType
-                                                      .outsideState,
-                                                  groupValue:
-                                                  _selectedTaxType,
-                                                  onChanged: (val) {
-                                                    setState(() {
-                                                      _selectedTaxType =
-                                                      val!;
-                                                      _recalculateTotals();
-                                                    });
-                                                  },
-                                                ),
-
-                                                const SizedBox(
-                                                  height: 8,
-                                                ),
-                                                Text(
-                                                  "Tax Amount: ₹${_calculatedTax.toStringAsFixed(2)}",
-                                                  style: const TextStyle(
-                                                    fontWeight:
-                                                    FontWeight
-                                                        .w600,
-                                                    fontSize: 15,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  "Total: ₹${_calculatedTotal.toStringAsFixed(2)}",
-                                                  style: const TextStyle(
-                                                    fontWeight:
-                                                    FontWeight
-                                                        .w600,
-                                                    fontSize: 15,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-
-                                        // --- Buttons ---
-                                        Padding(
-                                          padding:
-                                          const EdgeInsets.all(
-                                            12,
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Expanded(
-                                                child: OutlinedButton(
-                                                  onPressed: () =>
-                                                      Navigator.pop(
-                                                        context,
-                                                      ),
-                                                  style: OutlinedButton.styleFrom(
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius:
-                                                      BorderRadius.circular(
-                                                        12,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  child: Text(
-                                                    "cancel".tr(),
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(
-                                                width: 12,
-                                              ),
-                                              Expanded(
-                                                child: ElevatedButton(
-                                                  onPressed: () async {
-                                                    if (_companyNameController
-                                                        .text
-                                                        .isEmpty ||
-                                                        _cMobileNumberController
-                                                            .text
-                                                            .isEmpty ||
-                                                        _gstController
-                                                            .text
-                                                            .isEmpty ||
-                                                        _bankNameController
-                                                            .text
-                                                            .isEmpty ||
-                                                        _accountNumberController
-                                                            .text
-                                                            .isEmpty ||
-                                                        _ifscController
-                                                            .text
-                                                            .isEmpty ||
-                                                        _branchController
-                                                            .text
-                                                            .isEmpty ||
-                                                        _accountHolderController
-                                                            .text
-                                                            .isEmpty ||
-                                                        _billtoNameController
-                                                            .text
-                                                            .isEmpty ||
-                                                        _billtoMobileNumberController
-                                                            .text
-                                                            .isEmpty ||
-                                                        _invoiceNumberController
-                                                            .text
-                                                            .isEmpty ||
-                                                        _priceeController
-                                                            .text
-                                                            .isEmpty ||
-                                                        _taxPercentageController
-                                                            .text
-                                                            .isEmpty) {
-                                                      ScaffoldMessenger.of(
-                                                        context,
-                                                      ).showSnackBar(
-                                                        SnackBar(
-                                                          content: Text(
-                                                            'please_fill_required'
-                                                                .tr(),
-                                                          ),
-                                                        ),
-                                                      );
-                                                      return;
-                                                    }
-
-                                                    Navigator.pop(
-                                                      context,
-                                                    );
-                                                    await generateInvoice(
-                                                      shipment,
-                                                    );
-                                                    if (mounted) {
-                                                      setState(() {
-                                                        pdfStates[shipment['shipment_id']
-                                                            .toString()] =
-                                                            PdfState
-                                                                .uploaded;
-                                                      });
-                                                    }
-                                                    _companyNameController
-                                                        .clear();
-                                                    _cMobileNumberController
-                                                        .clear();
-                                                    _gstController
-                                                        .clear();
-                                                    _bankNameController
-                                                        .clear();
-                                                    _accountNumberController
-                                                        .clear();
-                                                    _ifscController
-                                                        .clear();
-                                                    _branchController
-                                                        .clear();
-                                                    _accountHolderController
-                                                        .clear();
-                                                    _billtoNameController
-                                                        .clear();
-                                                    _billtoMobileNumberController
-                                                        .clear();
-                                                    _invoiceNumberController
-                                                        .clear();
-                                                    _priceeController
-                                                        .clear();
-                                                    _taxPercentageController
-                                                        .clear();
-                                                    _calculatedTax =
-                                                    0.0;
-                                                    _calculatedTotal =
-                                                    0.0;
-                                                  },
-                                                  style: ElevatedButton.styleFrom(
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius:
-                                                      BorderRadius.circular(
-                                                        12,
-                                                      ),
-                                                    ),
-                                                    minimumSize:
-                                                    const Size.fromHeight(
-                                                      45,
-                                                    ),
-                                                  ),
-                                                  child: Text(
-                                                    "generate".tr(),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                        onDeleteInvoice: () async {
-                          await confirmAndDelete(context, shipment);
-                          if (mounted) {
-                            setState(() {
-                              pdfStates[shipment['shipment_id']
-                                  .toString()] =
-                                  PdfState.notGenerated;
-                            });
-                          }
-                        },
-                        onShareInvoice: () async {
-                          await shareInvoice(shipment);
-                        },
-                        customUserId: customUserId,
-                        role: role,
-                      );
-                    },
-                  ),
-                ),
-              ],
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await fetchShipments();
+          _processShipmentData();
+        },
+        child: loading
+            ? buildSkeletonLoader()
+            : filteredShipments.isEmpty
+            ? buildEmptyState()
+            : Column(
+          children: [
+            _buildMonthDropdown(),
+            const Divider(thickness: 1, height: 1),
+            Expanded(
+              child: _buildShipmentList(),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMonthDropdown() {
+    if (_sortedMonths.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: "select_month".tr(),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 4,
+          ),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: selectedMonth,
+            isExpanded: true,
+            hint: Text("choose_month".tr()),
+            icon: const Icon(Icons.calendar_month, color: Colors.blue),
+            onChanged: (value) {
+              setState(() => selectedMonth = value);
+            },
+            items: _sortedMonths.map((m) {
+              return DropdownMenuItem(
+                value: m,
+                child: Text(getMonthLabel(m)),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShipmentList() {
+    final shipmentsToShow = selectedMonth != null
+        ? (_groupedShipments[selectedMonth] ?? [])
+        : [];
+
+    if (shipmentsToShow.isEmpty) {
+      return Center(
+        child: Text(
+          "No shipments in $selectedMonth",
+          style: const TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 50),
+      itemCount: shipmentsToShow.length,
+      itemBuilder: (_, i) {
+        final shipment = shipmentsToShow[i];
+        final shipmentId = shipment['shipment_id'].toString();
+        final isRequested = _invoiceRequests.contains(shipmentId);
+
+        return shipment_card.ShipmentCard(
+          shipment: shipment,
+          pdfStates: pdfStates,
+          isInvoiceRequested: isRequested,
+          customUserId: customUserId,
+          role: role,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ShipmentDetailsPage(
+                  shipment: shipment,
+                  isHistoryPage: true,
+                ),
+              ),
+            );
+          },
+          onPreviewInvoice: () => previewInvoice(context, shipmentId),
+          onDownloadInvoice: () async {
+            await downloadInvoice(shipment);
+          },
+          onRequestInvoice: () => requestInvoice(shipment),
+          onGenerateInvoice: () => _showGenerateInvoiceDialog(shipment),
+          onDeleteInvoice: () async {
+            await confirmAndDelete(context, shipment);
+          },
+          onShareInvoice: () async {
+            await shareInvoice(shipment);
+          },
         );
       },
     );
   }
+
+  Future<void> _showGenerateInvoiceDialog(Map<String, dynamic> shipment) async {
+    await fetchBankAndGst();
+
+    final shipperId = shipment['shipper_id']?.toString();
+    if (shipperId != null) {
+      final customerInfo = await fetchCustomerNameAndMobile(shipperId);
+      _billToNameController.text = customerInfo['name'] ?? '';
+      _billToMobileNumberController.text = customerInfo['mobile_number'] ?? '';
+    }
+
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) {
+
+          void recalculateTotals() {
+            final price = double.tryParse(_priceController.text) ?? 0.0;
+            final taxPercent = double.tryParse(_taxPercentageController.text) ?? 0.0;
+
+            if (taxPercent <= 0 || price <= 0) {
+              setDialogState(() {
+                _calculatedTax = 0.0;
+                _calculatedTotal = price;
+              });
+              return;
+            }
+
+            setDialogState(() {
+              _calculatedTax = (price * taxPercent) / 100;
+              _calculatedTotal = price + _calculatedTax;
+            });
+          }
+
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 450, maxHeight: 600),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.receipt_long, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          "invoice_details".tr(),
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSectionHeader("company_information".tr(), Icons.business),
+                          _buildTextField(controller: _companyNameController, label: "company_name".tr()),
+                          _buildTextField(controller: _cMobileNumberController, label: "company_mobile_no".tr(), keyboard: TextInputType.phone),
+                          _buildTextField(controller: _gstController, label: "gst_number".tr()),
+
+                          const SizedBox(height: 16),
+                          _buildSectionHeader("bank_details".tr(), Icons.account_balance),
+                          _buildTextField(controller: _bankNameController, label: "bank_name".tr()),
+                          _buildTextField(controller: _accountNumberController, label: "account_number".tr(), keyboard: TextInputType.number),
+                          _buildTextField(controller: _ifscController, label: "ifsc_code".tr()),
+                          _buildTextField(controller: _branchController, label: "branch".tr()),
+                          _buildTextField(controller: _accountHolderController, label: "account_holder_name".tr()),
+
+                          const SizedBox(height: 16),
+                          _buildSectionHeader("customer_information".tr(), Icons.person_outline),
+                          _buildTextField(controller: _billToNameController, label: "customer_name".tr()),
+                          _buildTextField(controller: _billToMobileNumberController, label: "customer_mobile_no".tr(), keyboard: TextInputType.phone),
+
+                          const SizedBox(height: 16),
+                          _buildSectionHeader("Invoice Data", Icons.receipt),
+                          _buildTextField(controller: _invoiceNumberController, label: "invoice_no".tr()),
+                          _buildTextField(
+                            controller: _priceController,
+                            label: "price".tr(),
+                            keyboard: const TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (_) => recalculateTotals(),
+                          ),
+
+                          const SizedBox(height: 16),
+                          _buildSectionHeader("tax_details".tr(), Icons.percent),
+                          _buildTextField(
+                            controller: _taxPercentageController,
+                            label: "tax_percentage".tr(),
+                            keyboard: const TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (_) => recalculateTotals(),
+                          ),
+
+                          Container(
+                            margin: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: RadioGroup<TaxType>(
+                              groupValue: _selectedTaxType,
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setDialogState(() {
+                                    _selectedTaxType = val;
+                                    recalculateTotals();
+                                  });
+                                }
+                              },
+                              child: Column(
+                                children: [
+                                  RadioListTile<TaxType>(
+                                    title: Text("within_state".tr()),
+                                    value: TaxType.withinState,
+                                  ),
+                                  RadioListTile<TaxType>(
+                                    title: Text("outside_state".tr()),
+                                    value: TaxType.outsideState,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text("Tax Amount:"),
+                                    Text("₹${_calculatedTax.toStringAsFixed(2)}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text("Total:", style: TextStyle(fontSize: 16)),
+                                    Text("₹${_calculatedTotal.toStringAsFixed(2)}", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Theme.of(context).primaryColor)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: Text("cancel".tr()),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              if (_validateInvoiceForm()) {
+                                Navigator.pop(context);
+                                await generateInvoice(shipment);
+                                _clearInvoiceForm();
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: Text("generate".tr()),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 20, color: Colors.grey[600]),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        const Divider(),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  bool _validateInvoiceForm() {
+    if (_companyNameController.text.isEmpty ||
+        _cMobileNumberController.text.isEmpty ||
+        _gstController.text.isEmpty ||
+        _bankNameController.text.isEmpty ||
+        _accountNumberController.text.isEmpty ||
+        _ifscController.text.isEmpty ||
+        _branchController.text.isEmpty ||
+        _accountHolderController.text.isEmpty ||
+        _billToNameController.text.isEmpty ||
+        _billToMobileNumberController.text.isEmpty ||
+        _invoiceNumberController.text.isEmpty ||
+        _priceController.text.isEmpty ||
+        _taxPercentageController.text.isEmpty) {
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('please_fill_required'.tr())),
+      );
+      return false;
+    }
+    return true;
+  }
+
+  void _clearInvoiceForm() {
+    _companyNameController.clear();
+    _cMobileNumberController.clear();
+    _gstController.clear();
+    _bankNameController.clear();
+    _accountNumberController.clear();
+    _ifscController.clear();
+    _branchController.clear();
+    _accountHolderController.clear();
+    _billToNameController.clear();
+    _billToMobileNumberController.clear();
+    _invoiceNumberController.clear();
+    _priceController.clear();
+    _taxPercentageController.clear();
+    _calculatedTax = 0.0;
+    _calculatedTotal = 0.0;
+  }
 }
 
-// ShipmentSearchDelegate
 class ShipmentSearchDelegate extends SearchDelegate<String> {
   final List<Map<String, dynamic>> shipments;
   ShipmentSearchDelegate({required this.shipments});
@@ -1893,7 +1547,7 @@ class PdfPreviewScreen extends StatelessWidget {
   const PdfPreviewScreen({required this.localPath, Key? key}) : super(key: key);
 
   void sharePdf() {
-    Share.shareXFiles([XFile(localPath)], text: 'sharing_invoice_pdf'.tr());
+    SharePlus.instance.share(ShareParams(files: [XFile(localPath)], text: 'sharing_invoice_pdf'.tr()));
   }
 
   @override

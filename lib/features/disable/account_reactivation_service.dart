@@ -1,17 +1,12 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../notifications/notification_manager.dart';
 
-/// Service for handling account reactivation requests
 class AccountReactivationService {
   static final supabase = Supabase.instance.client;
-
-  /// Check who disabled the account and return the disable info
-  /// Uses only user_profiles table for simplicity and reliability
   static Future<Map<String, dynamic>?> getAccountDisableInfo({
     required String customUserId,
   }) async {
     try {
-      // Get user profile with disable info
       final profileResponse = await supabase
           .from('user_profiles')
           .select(
@@ -22,56 +17,37 @@ class AccountReactivationService {
 
       if (profileResponse == null ||
           profileResponse['account_disable'] != true) {
-        return null; // Account is not disabled
+        return null;
       }
-
-      print('🔍 ProfileResponse for $customUserId: $profileResponse');
 
       final disabledByAdmin =
           profileResponse['disabled_by_admin'] as bool? ?? false;
       final lastChangedBy = profileResponse['last_changed_by'] as String?;
       final disabledByRole =
       profileResponse['account_disabled_by_role'] as String?;
-
-      print('🔍 disabledByAdmin: $disabledByAdmin');
-      print('🔍 lastChangedBy: $lastChangedBy');
-      print('🔍 customUserId: $customUserId');
-      print(
-        '🔍 Check: lastChangedBy != customUserId = ${lastChangedBy != customUserId}',
-      );
-
-      // If disabled_by_admin flag is true, it was disabled by admin/agent/truckowner
       if (disabledByAdmin &&
           lastChangedBy != null &&
           lastChangedBy != customUserId) {
-        print('🔍 Fetching disabler profile for: $lastChangedBy');
 
-        // Get the admin/agent/truckowner profile who disabled the account
         final disablerProfile = await supabase
             .from('user_profiles')
-            .select('custom_user_id, name, role, email, mobile_number')
+            .select(
+          'custom_user_id, name, role, email, mobile_number',
+        )
             .eq('custom_user_id', lastChangedBy)
             .maybeSingle();
-
-        print('🔍 Disabler Profile: $disablerProfile');
 
         final disablerRole =
             disablerProfile?['role'] ?? disabledByRole ?? 'admin';
 
-        print('🔍 Disabler Role: $disablerRole');
-
-        // Verify the disabler has authority (admin, agent, or truckowner)
-        // Convert to lowercase for case-insensitive comparison and handle variations
         final roleLower = disablerRole.toString().toLowerCase();
         final hasAuthority = [
           'admin',
           'agent',
           'truckowner',
-          'truck_owner', // Handle underscore variant
-          'company', // Some places use 'company' for truckowner
+          'truck_owner',
+          'company',
         ].contains(roleLower);
-
-        print('🔍 Has Authority: $hasAuthority');
 
         if (hasAuthority) {
           return {
@@ -83,19 +59,8 @@ class AccountReactivationService {
             'disabler_phone': disablerProfile?['mobile_number'],
             'reason': 'Account disabled by $disablerRole',
           };
-        } else {
-          print('⚠️ Disabler does not have authority, role: $disablerRole');
         }
-      } else {
-        print('⚠️ Conditions not met for admin disable:');
-        print('   - disabledByAdmin: $disabledByAdmin');
-        print('   - lastChangedBy != null: ${lastChangedBy != null}');
-        print(
-          '   - lastChangedBy != customUserId: ${lastChangedBy != customUserId}',
-        );
       }
-
-      // Self-disabled (or disabled_by_admin is false)
       return {
         'is_self_disabled': true,
         'disabled_by': customUserId,
@@ -107,7 +72,6 @@ class AccountReactivationService {
     }
   }
 
-  /// Send reactivation request to the admin/agent who disabled the account
   static Future<Map<String, dynamic>> sendReactivationRequest({
     required String requesterId,
     required String requesterName,
@@ -115,7 +79,6 @@ class AccountReactivationService {
     required String requestMessage,
   }) async {
     try {
-      // Get disabler's user_id for notification
       final disablerProfile = await supabase
           .from('user_profiles')
           .select('user_id, name, role')
@@ -129,7 +92,6 @@ class AccountReactivationService {
         };
       }
 
-      // Create notification for the disabler
       await NotificationManager().createNotification(
         userId: disablerProfile['user_id'],
         title: 'Account Reactivation Request',
@@ -140,7 +102,6 @@ class AccountReactivationService {
         sourceId: requesterId,
       );
 
-      // Log the reactivation request in account_status_logs
       await supabase.from('account_status_logs').insert({
         'target_custom_id': requesterId,
         'performed_by_custom_id': requesterId,
@@ -169,24 +130,17 @@ class AccountReactivationService {
       };
     }
   }
-
-  /// Enable an account (called by admin/agent who disabled it)
   static Future<Map<String, dynamic>> enableAccount({
     required String targetCustomId,
     required String performedByCustomId,
     String? reason,
   }) async {
     try {
-      // Update account_disable to false
-      await supabase
-          .from('user_profiles')
-          .update({
+      await supabase.from('user_profiles').update({
         'account_disable': false,
         'updated_at': DateTime.now().toIso8601String(),
-      })
-          .eq('custom_user_id', targetCustomId);
+      }).eq('custom_user_id', targetCustomId);
 
-      // Log the enable action
       await supabase.from('account_status_logs').insert({
         'target_custom_id': targetCustomId,
         'performed_by_custom_id': performedByCustomId,
@@ -199,7 +153,6 @@ class AccountReactivationService {
         'created_at': DateTime.now().toIso8601String(),
       });
 
-      // Send notification to the user whose account was enabled
       final targetProfile = await supabase
           .from('user_profiles')
           .select('user_id, name')
@@ -227,7 +180,6 @@ class AccountReactivationService {
     }
   }
 
-  /// Check if there's a pending reactivation request
   static Future<bool> hasPendingReactivationRequest({
     required String customUserId,
   }) async {
@@ -243,12 +195,10 @@ class AccountReactivationService {
 
       if (recentRequest == null) return false;
 
-      // Check if request was made in the last 24 hours
       final requestTime = DateTime.parse(recentRequest['created_at']);
       final now = DateTime.now();
-      final difference = now.difference(requestTime);
 
-      return difference.inHours < 24;
+      return now.difference(requestTime).inHours < 24;
     } catch (e) {
       print('Error checking pending request: $e');
       return false;

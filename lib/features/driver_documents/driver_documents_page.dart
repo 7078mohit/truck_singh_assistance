@@ -538,7 +538,7 @@ class _DriverDocumentsPageState extends State<DriverDocumentsPage>
                         },
                         backgroundColor: selected ? AppColors.teal : null,
                         selectedColor: AppColors.teal,
-                        labelStyle: TextStyle(color: selected ? Colors.white : Colors.black),
+                        labelStyle: TextStyle(color:Colors.white),
                       ),
                     );
                   }).toList(),

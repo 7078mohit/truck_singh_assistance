@@ -49,21 +49,19 @@ class _ShipmentCardState extends State<ShipmentCard> {
       ),
       '',
     )
-        .replaceAll(RegExp(r'\s+'), ' ') // normalize spaces
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 
     List<String> parts = cleaned.split(',');
     parts = parts.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
 
     if (parts.length >= 3) {
-      String first = parts[0]; // village/area
+      String first = parts[0];
       String city = parts[parts.length - 2];
-      //String state = parts[parts.length - 1];
       return "$first,$city";
     } else if (parts.length == 2) {
       return "${parts[0]}, ${parts[1]}";
     } else {
-      // fallback: just shorten
       return cleaned.length > 50 ? "${cleaned.substring(0, 50)}..." : cleaned;
     }
   }
@@ -84,7 +82,6 @@ class _ShipmentCardState extends State<ShipmentCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Row : ID
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -98,14 +95,11 @@ class _ShipmentCardState extends State<ShipmentCard> {
                 ],
               ),
               const SizedBox(height: 6),
-
-              // completed date
               Text(
                 "completed : $completedAt".tr(),
                 style: const TextStyle(color: Colors.grey, fontSize: 14),
               ),
               const SizedBox(height: 16),
-              // pickup and drop address
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -247,7 +241,6 @@ class _ShipmentCardState extends State<ShipmentCard> {
                   ),
                 ),
               ),
-            // The generate button
             SizedBox(
               child: ElevatedButton.icon(
                 onPressed: widget.onGenerateInvoice,
@@ -324,7 +317,7 @@ class _ShipmentCardState extends State<ShipmentCard> {
           SizedBox(
             child: ElevatedButton.icon(
               onPressed: () async {
-                final result = await Navigator.push(
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => Rating(

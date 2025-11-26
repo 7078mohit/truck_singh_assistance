@@ -25,11 +25,9 @@ class ShipmentDetailsPage extends StatefulWidget {
 
 class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
     with TickerProviderStateMixin {
-  GoogleMapController? _mapController;
   Timer? _trackingTimer;
   LatLng? _currentLocation;
   Map<String, int> ratingEditCount = {};
-  Set<Marker> _markers = {};
 
   late String currentUserCustomId;
   bool isFetchingUserId = true; // optional: for loading state
@@ -45,19 +43,13 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
         currentUserCustomId == assignedAgent;
   }
 
-  Set<Polyline> _polylines = {};
-  bool _isMapLoading = true;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-
-  final LatLng _pickupLocation = LatLng(26.9124, 75.7873); // Jaipur
-  final LatLng _dropLocation = LatLng(28.6139, 77.2090); // Delhi
 
   @override
   void initState() {
     super.initState();
     _setupAnimations();
-    _initializeMap();
     _startLiveTracking();
     _fetchCurrentUserCustomId();
   }
@@ -113,65 +105,6 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
     return DateTime.now().difference(deliveryDate).inDays <= 7;
   }
 
-  void _initializeMap() {
-    // Simulate current location between pickup and drop
-    double lat = (_pickupLocation.latitude + _dropLocation.latitude) / 2;
-    double lng = (_pickupLocation.longitude + _dropLocation.longitude) / 2;
-    _currentLocation = LatLng(lat + (Random().nextDouble() - 0.5) * 0.1, lng);
-
-    _updateMarkers();
-    _createRoute();
-
-    setState(() {
-      _isMapLoading = false;
-    });
-  }
-
-  void _updateMarkers() {
-    _markers = {
-      Marker(
-        markerId: MarkerId('pickup'),
-        position: _pickupLocation,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        infoWindow: InfoWindow(
-          title: 'pickupLocation'.tr(),
-          snippet: widget.shipment['pickup'] ?? '',
-        ),
-      ),
-      Marker(
-        markerId: MarkerId('drop'),
-        position: _dropLocation,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        infoWindow: InfoWindow(
-          title: 'dropLocation'.tr(),
-          snippet: widget.shipment['drop'] ?? '',
-        ),
-      ),
-      if (_currentLocation != null)
-        Marker(
-          markerId: MarkerId('current'),
-          position: _currentLocation!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-          infoWindow: InfoWindow(
-            title: 'currentLocation'.tr(),
-            snippet: 'vehicleIsHere'.tr(),
-          ),
-        ),
-    };
-  }
-
-  void _createRoute() {
-    _polylines = {
-      Polyline(
-        polylineId: PolylineId('route'),
-        points: [_pickupLocation, _currentLocation!, _dropLocation],
-        color: Colors.blue,
-        width: 4,
-        patterns: [PatternItem.dash(20), PatternItem.gap(10)],
-      ),
-    };
-  }
-
   void _startLiveTracking() {
     _trackingTimer = Timer.periodic(Duration(seconds: 10), (timer) {
       // Simulate vehicle movement
@@ -183,8 +116,6 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
 
         setState(() {
           _currentLocation = LatLng(newLat, newLng);
-          _updateMarkers();
-          _createRoute();
         });
       }
     });
@@ -415,9 +346,7 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
               icon: Icon(Icons.refresh),
               onPressed: () {
                 setState(() {
-                  _isMapLoading = true;
                 });
-                _initializeMap();
               },
             ),
           ],
@@ -436,7 +365,7 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
                         getStatusColor(widget.shipment['booking_status']),
                         getStatusColor(
                           widget.shipment['booking_status'],
-                        ).withOpacity(0.7),
+                        ).withValues(alpha: 7),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -446,7 +375,7 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
                       BoxShadow(
                         color: getStatusColor(
                           widget.shipment['booking_status'],
-                        ).withOpacity(0.3),
+                        ).withValues(alpha: 3),
                         blurRadius: 10,
                         offset: Offset(0, 4),
                       ),
@@ -518,7 +447,7 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 10,
                             offset: Offset(0, 2),
                           ),
@@ -581,7 +510,7 @@ class _ShipmentDetailsPageState extends State<ShipmentDetailsPage>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 10,
                         offset: Offset(0, 2),
                       ),

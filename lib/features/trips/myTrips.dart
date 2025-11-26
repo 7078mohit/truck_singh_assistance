@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart' as ptr;
 import 'dart:convert';
@@ -28,7 +27,7 @@ class _MyShipmentsPageState extends State<MyShipments> {
     initialRefresh: false,
   );
   SharedPreferences? _prefs;
-  final MytripsServices _supabase_service = MytripsServices();
+  final MyTripsServices _supabase_service = MyTripsServices();
 
   @override
   void initState() {
@@ -167,40 +166,49 @@ class _MyShipmentsPageState extends State<MyShipments> {
   }
 
   void showFilterDialog() {
+    final List<String> statuses = [
+      'All',
+      'Pending',
+      'Accepted',
+      'En Route to Pickup',
+      'Arrived at Pickup',
+      'Loading',
+      'Picked Up',
+      'In Transit',
+      'Arrived at Drop',
+      'Unloading',
+      'Delivered',
+      'Completed',
+    ];
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        contentPadding: EdgeInsets.symmetric(vertical: 8 , horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
         title: Text('filterByStatus'.tr()),
         content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              'All',
-              'Pending',
-              'Accepted',
-              'En Route to Pickup',
-              'Arrived at Pickup',
-              'Loading',
-              'Picked Up',
-              'In Transit',
-              'Arrived at Drop',
-              'Unloading',
-              'Delivered',
-              'Completed',
-            ].map((status) {
-              return RadioListTile<String>(
-                value: status,
-                groupValue: statusFilter,
-                title: Text(status.tr()),
-                onChanged: (val) {
-                  if (val != null) {
-                    Navigator.pop(context);
-                    filterByStatus(val);
-                  }
-                },
-              );
-            }).toList(),
+          // 1. Wrap the list container in a RadioGroup
+          child: RadioGroup<String>(
+            // 2. Manage the state (value and callback) here in the parent
+            groupValue: statusFilter,
+            onChanged: (val) {
+              if (val != null) {
+                Navigator.pop(context);
+                filterByStatus(val);
+              }
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: statuses.map((status) {
+                // 3. The child tiles only need the 'value' and 'title'
+                // 'groupValue' and 'onChanged' are removed
+                return RadioListTile<String>(
+                  value: status,
+                  title: Text(status.tr()),
+                  activeColor: Colors.teal,
+                );
+              }).toList(),
+            ),
           ),
         ),
       ),
@@ -639,7 +647,7 @@ class _MyShipmentsPageState extends State<MyShipments> {
                                   height: 80,
                                   width: 80,
                                   decoration: BoxDecoration(
-                                    color: Colors.teal.withOpacity(0.1),
+                                    color: Colors.teal.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
                                       color: Colors.teal.shade100,

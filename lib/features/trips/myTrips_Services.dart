@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class MytripsServices {
+class MyTripsServices {
   final _client = Supabase.instance.client;
 
   Future<Map<String, String?>> getUserProfile(String userId) async {
@@ -53,7 +53,6 @@ class MytripsServices {
     return List<Map<String, dynamic>>.from(response);
   }
 
-  // --- existing rating method unchanged ---
   Future<Map<String, int>> getRatingEditCounts() async {
     final response = await _client
         .from('ratings')

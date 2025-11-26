@@ -19,41 +19,35 @@ class UnableAccountPage extends StatefulWidget {
 
 class _UnableAccountPageState extends State<UnableAccountPage> {
   final supabase = Supabase.instance.client;
+
   bool _isSendingOtp = false;
   bool _isRequestingAccess = false;
   bool _isCheckingRelation = true;
 
-  // Variables for disable/enable logic
   Map<String, dynamic>? _disableInfo;
   bool _hasPendingRequest = false;
 
   @override
   void initState() {
     super.initState();
-    // Debug: print('UnableAccountPage initialized with user profile: ${widget.userProfile}');
     _checkAccountDisableInfo();
   }
 
   String get userName => widget.userProfile['name'] ?? 'Unknown User';
   String get customUserId => widget.userProfile['custom_user_id'] ?? '';
-  String get phoneNumber =>
-      widget.userProfile['mobile_number'] ?? 'Not provided';
+  String get phoneNumber => widget.userProfile['mobile_number'] ?? 'Not provided';
   String get email => widget.userProfile['email'] ?? 'Not provided';
   String get role => widget.userProfile['role'] ?? '';
   String? get profilePicture => widget.userProfile['profile_picture'];
 
-  // Helper method to check if user is agent or truck owner
   bool _isAgentOrTruckOwner() {
     return role == 'agent' || role == 'truckowner';
   }
 
-  // Helper method to determine if request activation should be used
   bool _shouldUseRequestActivation() {
-    // Check if account was disabled by an admin/agent (not self-disabled)
     if (_disableInfo != null && _disableInfo!['is_self_disabled'] == false) {
-      return true; // Use request access flow
+      return true;
     }
-    // Otherwise use OTP flow (self-disabled or no disable info)
     return false;
   }
 
@@ -76,50 +70,32 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
     }
   }
 
-  /// Check who disabled the account and determine the appropriate reactivation method
   Future<void> _checkAccountDisableInfo() async {
     try {
       if (customUserId.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _isCheckingRelation = false;
-          });
-        }
+        setState(() => _isCheckingRelation = false);
         return;
       }
 
-      // Get disable info from the new service
       final disableInfo =
       await AccountReactivationService.getAccountDisableInfo(
         customUserId: customUserId,
       );
 
-      // Check for pending reactivation request
       final hasPending =
       await AccountReactivationService.hasPendingReactivationRequest(
         customUserId: customUserId,
       );
 
-      if (mounted) {
-        setState(() {
-          _disableInfo = disableInfo;
-          _hasPendingRequest = hasPending;
-          _isCheckingRelation = false;
+      if (!mounted) return;
 
-          // Debug logging
-          print('🔍 Disable Info: $_disableInfo');
-          print(
-            '🔍 Should use request activation: ${_shouldUseRequestActivation()}',
-          );
-        });
-      }
+      setState(() {
+        _disableInfo = disableInfo;
+        _hasPendingRequest = hasPending;
+        _isCheckingRelation = false;
+      });
     } catch (e) {
-      print('Error checking account disable info: $e');
-      if (mounted) {
-        setState(() {
-          _isCheckingRelation = false;
-        });
-      }
+      setState(() => _isCheckingRelation = false);
     }
   }
 
@@ -129,16 +105,15 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
     final disablerId = _disableInfo?['disabled_by'] as String?;
     if (disablerId == null) return;
 
-    // Show dialog to get the request message
     final messageController = TextEditingController();
+
     final message = await showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
+      builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: [
               Icon(Icons.message, color: AppColors.teal),
@@ -172,11 +147,8 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(null),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
+              onPressed: () => Navigator.pop(context, null),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -189,14 +161,11 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
                   );
                   return;
                 }
-                Navigator.of(context).pop(messageController.text.trim());
+                Navigator.pop(context, messageController.text.trim());
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.teal,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
               ),
               child: const Text('Send Request'),
             ),
@@ -205,15 +174,11 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
       },
     );
 
-    // If user cancelled, return
     if (message == null) return;
 
-    setState(() {
-      _isRequestingAccess = true;
-    });
+    setState(() => _isRequestingAccess = true);
 
     try {
-      // Use the new service to send reactivation request
       final result = await AccountReactivationService.sendReactivationRequest(
         requesterId: customUserId,
         requesterName: userName,
@@ -227,94 +192,72 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
         NotificationService.sendPushNotificationToUser(
           recipientId: disablerId,
           title: 'Account Reactivation Request'.tr(),
-          message: '$userName ' + 'is requesting to reactivate their account.'.tr() + '\n' + 'Message:'.tr() + ' $message',
+          message:
+          '$userName ${"is requesting to reactivate their account.".tr()}\n${"Message:".tr()} $message',
           data: {
             'type': 'reactivation_request',
             'requester_id': customUserId,
           },
         );
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               'Request sent to ${result['disabler_name']} successfully',
             ),
             backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
           ),
         );
 
-        // Refresh to show pending status
-        setState(() {
-          _hasPendingRequest = true;
-        });
+        setState(() => _hasPendingRequest = true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['error'] ?? 'Failed to send request'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
           ),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error sending request: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
+        SnackBar(content: Text('Error sending request: $e'), backgroundColor: Colors.red),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isRequestingAccess = false;
-        });
-      }
+      if (mounted) setState(() => _isRequestingAccess = false);
     }
   }
 
   Future<void> _sendOtpForSelfActivation() async {
     if (_isSendingOtp) return;
 
-    setState(() {
-      _isSendingOtp = true;
-    });
+    setState(() => _isSendingOtp = true);
 
     try {
-      // Use email for OTP (simplified approach)
       if (email == 'Not provided' || !email.contains('@')) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'No valid email found in your profile. Please contact support.',
-            ),
+            content: Text('No valid email found. Please contact support.'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 4),
           ),
         );
         return;
       }
 
-      print('Sending OTP to email from user_profiles: $email');
-
-      // Send OTP using our service
       final result = await OtpActivationService.sendActivationOtp(email: email);
 
       if (!mounted) return;
 
       if (result['ok'] == true) {
-        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Activation OTP sent to $email'),
             backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
           ),
         );
 
-        // Navigate to OTP verification page
-        Navigator.of(context).push(
+        Navigator.push(
+          context,
           MaterialPageRoute(
             builder: (context) => OtpVerificationPage(
               email: email,
@@ -327,27 +270,13 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to send OTP: ${result['error']}'),
+            content: Text(result['error'] ?? 'Failed to send OTP'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
           ),
         );
       }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error sending OTP: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSendingOtp = false;
-        });
-      }
+      if (mounted) setState(() => _isSendingOtp = false);
     }
   }
 
@@ -355,13 +284,10 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
     try {
       await OtpActivationService.signOut();
       if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error signing out: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error signing out: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -376,32 +302,24 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _signOut,
-            tooltip: 'Sign Out',
-          ),
+          IconButton(icon: const Icon(Icons.logout), onPressed: _signOut),
         ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Status Icon
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade100,
-                  shape: BoxShape.circle,
-                ),
+                decoration:
+                BoxDecoration(color: Colors.red.shade100, shape: BoxShape.circle),
                 child: Icon(Icons.block, size: 60, color: Colors.red.shade700),
               ),
 
               const SizedBox(height: 24),
 
-              // Title
               Text(
                 'Account Disabled',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -413,292 +331,26 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
 
               const SizedBox(height: 16),
 
-              // Description
               Text(
                 'Your account has been disabled. Please contact your administrator or request activation below.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
+                style: TextStyle(color: Colors.grey.shade600),
                 textAlign: TextAlign.center,
               ),
 
               const SizedBox(height: 32),
 
-              // Profile Card
-              Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      // Profile Picture
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: AppColors.teal.withOpacity(0.1),
-                        backgroundImage:
-                        profilePicture != null && profilePicture!.isNotEmpty
-                            ? NetworkImage(profilePicture!)
-                            : null,
-                        child: profilePicture == null || profilePicture!.isEmpty
-                            ? const Icon(
-                          Icons.person,
-                          size: 50,
-                          color: AppColors.teal,
-                        )
-                            : null,
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // User Details
-                      _buildDetailRow('Name', userName),
-                      _buildDetailRow('User ID', customUserId),
-                      _buildDetailRow('Phone', phoneNumber),
-                      _buildDetailRow('Email', email),
-                      _buildDetailRow('Role', formattedRole),
-                    ],
-                  ),
-                ),
-              ),
+              _buildProfileCard(),
 
               const SizedBox(height: 32),
 
-              // Conditional Activation Section
-              if (_isCheckingRelation)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: const Column(
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 12),
-                      Text('Checking account status...'),
-                    ],
-                  ),
-                )
-              else if (_shouldUseRequestActivation())
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: _hasPendingRequest
-                        ? Colors.blue.shade50
-                        : Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _hasPendingRequest
-                          ? Colors.blue.shade200
-                          : Colors.orange.shade200,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        _hasPendingRequest
-                            ? Icons.hourglass_empty
-                            : Icons.supervisor_account,
-                        color: _hasPendingRequest
-                            ? Colors.blue.shade600
-                            : Colors.orange.shade600,
-                        size: 32,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _hasPendingRequest
-                            ? 'Request Pending'
-                            : 'Request Account Activation',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _hasPendingRequest
-                              ? Colors.blue.shade800
-                              : Colors.orange.shade800,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _hasPendingRequest
-                            ? 'Your reactivation request has been sent to ${_disableInfo?['disabler_name'] ?? 'the admin'}. Please wait for their approval.'
-                            : 'Your account was disabled by ${_disableInfo?['disabler_name'] ?? 'an admin'}. Send them a request to reactivate your account.',
-                        style: TextStyle(
-                          color: _hasPendingRequest
-                              ? Colors.blue.shade700
-                              : Colors.orange.shade700,
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      if (_disableInfo != null && !_hasPendingRequest) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Disabled by: ${_disableInfo!['disabler_name']}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey.shade800,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              Text(
-                                'Role: ${_disableInfo!['disabler_role']?.toString().toUpperCase()}',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              if (_disableInfo!['reason'] != null)
-                                Text(
-                                  'Reason: ${_disableInfo!['reason']}',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                )
-              else
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.security,
-                        color: Colors.blue.shade600,
-                        size: 32,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Activate Your Account',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade800,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _isAgentOrTruckOwner()
-                            ? 'Verify your email address to reactivate your account.'
-                            : 'Verify your email address to activate your account and start using the app.',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
+              _buildActionSection(),
 
               const SizedBox(height: 24),
 
-              // Conditional Action Button
-              if (!_isCheckingRelation)
-                SizedBox(
-                  width: double.infinity,
-                  child: _shouldUseRequestActivation()
-                      ? ElevatedButton.icon(
-                    onPressed: (_isRequestingAccess || _hasPendingRequest)
-                        ? null
-                        : _requestAccessFromOwner,
-                    icon: _isRequestingAccess
-                        ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.white,
-                        ),
-                      ),
-                    )
-                        : Icon(
-                      _hasPendingRequest
-                          ? Icons.check_circle
-                          : Icons.send,
-                    ),
-                    label: Text(
-                      _isRequestingAccess
-                          ? 'Sending Request...'
-                          : _hasPendingRequest
-                          ? 'Request Sent - Waiting for Approval'
-                          : 'Request Access',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _hasPendingRequest
-                          ? Colors.blue.shade600
-                          : Colors.orange.shade600,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  )
-                      : ElevatedButton.icon(
-                    onPressed: _isSendingOtp
-                        ? null
-                        : _sendOtpForSelfActivation,
-                    icon: _isSendingOtp
-                        ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.white,
-                        ),
-                      ),
-                    )
-                        : const Icon(Icons.verified_user),
-                    label: Text(
-                      _isSendingOtp
-                          ? 'Sending OTP...'
-                          : _isAgentOrTruckOwner()
-                          ? 'Send OTP & Reactivate'
-                          : 'Send OTP & Activate',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.teal,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
+              _buildActionButton(),
 
               const SizedBox(height: 16),
 
-              // Sign Out Button
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -706,24 +358,18 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
                   icon: const Icon(Icons.logout),
                   label: const Text('Sign Out'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.grey.shade700,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    foregroundColor: Colors.grey.shade700,
                   ),
                 ),
               ),
 
               const SizedBox(height: 24),
 
-              // Help Text
               Text(
                 'Need immediate assistance? Contact support at:\nsupport@logisticapp.com',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade500),
                 textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade500),
               ),
             ],
           ),
@@ -732,25 +378,219 @@ class _UnableAccountPageState extends State<UnableAccountPage> {
     );
   }
 
+  Widget _buildProfileCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 50,
+              backgroundColor: AppColors.teal.withOpacity(0.1),
+              backgroundImage:
+              (profilePicture != null && profilePicture!.isNotEmpty)
+                  ? NetworkImage(profilePicture!)
+                  : null,
+              child: (profilePicture == null || profilePicture!.isEmpty)
+                  ? const Icon(Icons.person, size: 50, color: AppColors.teal)
+                  : null,
+            ),
+            const SizedBox(height: 16),
+            _buildDetailRow('Name', userName),
+            _buildDetailRow('User ID', customUserId),
+            _buildDetailRow('Phone', phoneNumber),
+            _buildDetailRow('Email', email),
+            _buildDetailRow('Role', formattedRole),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionSection() {
+    if (_isCheckingRelation) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Column(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 12),
+            Text('Checking account status...'),
+          ],
+        ),
+      );
+    }
+
+    if (_shouldUseRequestActivation()) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _hasPendingRequest ? Colors.blue.shade50 : Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              _hasPendingRequest ? Icons.hourglass_empty : Icons.supervisor_account,
+              color: _hasPendingRequest ? Colors.blue.shade600 : Colors.orange.shade600,
+              size: 32,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _hasPendingRequest ? 'Request Pending' : 'Request Account Activation',
+              style: TextStyle(
+                color: _hasPendingRequest ? Colors.blue.shade800 : Colors.orange.shade800,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _hasPendingRequest
+                  ? 'Your reactivation request has been sent to ${_disableInfo?['disabler_name'] ?? 'the admin'}. Please wait for their approval.'
+                  : 'Your account was disabled by ${_disableInfo?['disabler_name'] ?? 'an admin'}. Send them a request to reactivate your account.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _hasPendingRequest ? Colors.blue.shade700 : Colors.orange.shade700,
+              ),
+            ),
+            if (!_hasPendingRequest && _disableInfo != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration:
+                BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Disabled by: ${_disableInfo!['disabler_name']}',
+                      style: TextStyle(color: Colors.grey.shade800, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Role: ${_disableInfo!['disabler_role'].toString().toUpperCase()}',
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
+                    if (_disableInfo!['reason'] != null)
+                      Text('Reason: ${_disableInfo!['reason']}', style: TextStyle(color: Colors.grey.shade600)),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.security, color: Colors.blue.shade600, size: 32),
+          const SizedBox(height: 12),
+          Text(
+            'Activate Your Account',
+            style: TextStyle(color: Colors.blue.shade800, fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _isAgentOrTruckOwner()
+                ? 'Verify your email address to reactivate your account.'
+                : 'Verify your email address to activate your account.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.blue.shade700),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton() {
+    if (_isCheckingRelation) return const SizedBox();
+
+    if (_shouldUseRequestActivation()) {
+      return ElevatedButton.icon(
+        onPressed: (_isRequestingAccess || _hasPendingRequest)
+            ? null
+            : _requestAccessFromOwner,
+        icon: _isRequestingAccess
+            ? const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation(Colors.white),
+          ),
+        )
+            : Icon(_hasPendingRequest ? Icons.check_circle : Icons.send),
+        label: Text(
+          _isRequestingAccess
+              ? 'Sending Request...'
+              : _hasPendingRequest
+              ? 'Request Sent - Waiting'
+              : 'Request Access',
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor:
+          _hasPendingRequest ? Colors.blue.shade600 : Colors.orange.shade600,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
+
+    return ElevatedButton.icon(
+      onPressed: _isSendingOtp ? null : _sendOtpForSelfActivation,
+      icon: _isSendingOtp
+          ? const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation(Colors.white),
+        ),
+      )
+          : const Icon(Icons.verified_user),
+      label: Text(
+        _isSendingOtp
+            ? 'Sending OTP...'
+            : _isAgentOrTruckOwner()
+            ? 'Send OTP & Reactivate'
+            : 'Send OTP & Activate',
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.teal,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
             width: 80,
             child: Text(
               '$label:',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
-              ),
+              style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
             ),
           ),
-          Expanded(
-            child: Text(value, style: TextStyle(color: Colors.grey.shade800)),
-          ),
+          Expanded(child: Text(value, style: TextStyle(color: Colors.grey.shade800))),
         ],
       ),
     );

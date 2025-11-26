@@ -486,8 +486,8 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
           },
         ),
         _buildFeatureCard(
-          title: 'My Chats',
-          subtitle: 'View your Chats',
+          title: 'my_chats_title'.tr(),
+          subtitle: 'my_chats_subtitle'.tr(),
           icon: Icons.chat_bubble_outline,
           color: Colors.blue,
           onTap: () => Navigator.push(
@@ -495,6 +495,7 @@ class _CompanyDriverDbState extends State<CompanyDriverDb> {
             MaterialPageRoute(builder: (_) => const DriverChatListPage()),
           ),
         ),
+
       ],
     );
   }

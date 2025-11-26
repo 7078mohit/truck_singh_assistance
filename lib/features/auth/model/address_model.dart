@@ -1,6 +1,31 @@
 import 'package:easy_localization/easy_localization.dart';
 
-class BillingAddress {
+mixin AddressMixin {
+  String get flatNo;
+  String get streetName;
+  String get cityName;
+  String get district;
+  String get zipCode;
+
+  Map<String, dynamic> toLocalizedJson() => {
+    'flatNo'.tr(): flatNo,
+    'streetName'.tr(): streetName,
+    'cityName'.tr(): cityName,
+    'district'.tr(): district,
+    'zipCode'.tr(): zipCode,
+  };
+
+  Map<String, dynamic> toJson() => {
+    'flatNo': flatNo,
+    'streetName': streetName,
+    'cityName': cityName,
+    'district': district,
+    'zipCode': zipCode,
+  };
+}
+
+class BillingAddress with AddressMixin {
+  @override
   String flatNo, streetName, cityName, district, zipCode;
 
   BillingAddress({
@@ -11,25 +36,6 @@ class BillingAddress {
     required this.zipCode,
   });
 
-  /// Generates a map with localized keys for display purposes.
-  /// Note: This is not recommended for sending data to a server/API.
-  Map<String, dynamic> toLocalizedJson() => {
-    'flatNo'.tr(): flatNo,
-    'streetName'.tr(): streetName,
-    'cityName'.tr(): cityName,
-    'district'.tr(): district,
-    'zipCode'.tr(): zipCode,
-  };
-  
-  /// Generates a map with fixed keys for server communication.
-  Map<String, dynamic> toJson() => {
-    'flatNo': flatNo,
-    'streetName': streetName,
-    'cityName': cityName,
-    'district': district,
-    'zipCode': zipCode,
-  };
-
   factory BillingAddress.fromJson(Map<String, dynamic> json) => BillingAddress(
     flatNo: json['flatNo'] ?? '',
     streetName: json['streetName'] ?? '',
@@ -39,7 +45,8 @@ class BillingAddress {
   );
 }
 
-class CompanyAddress {
+class CompanyAddress with AddressMixin {
+  @override
   String flatNo, streetName, cityName, district, zipCode;
 
   CompanyAddress({
@@ -49,25 +56,6 @@ class CompanyAddress {
     required this.district,
     required this.zipCode,
   });
-
-  /// Generates a map with localized keys for display purposes.
-  /// Note: This is not recommended for sending data to a server/API.
-  Map<String, dynamic> toLocalizedJson() => {
-    'flatNo'.tr(): flatNo,
-    'streetName'.tr(): streetName,
-    'cityName'.tr(): cityName,
-    'district'.tr(): district,
-    'zipCode'.tr(): zipCode,
-  };
-
-  /// Generates a map with fixed keys for server communication.
-  Map<String, dynamic> toJson() => {
-    'flatNo': flatNo,
-    'streetName': streetName,
-    'cityName': cityName,
-    'district': district,
-    'zipCode': zipCode,
-  };
 
   factory CompanyAddress.fromJson(Map<String, dynamic> json) => CompanyAddress(
     flatNo: json['flatNo'] ?? '',
