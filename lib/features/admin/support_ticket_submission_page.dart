@@ -294,7 +294,7 @@ class _SupportTicketSubmissionPageState
                 const SizedBox(height: 16),
 
                 DropdownButtonFormField<String>(
-                  value: _selectedCategory,
+                  initialValue: _selectedCategory,
                   decoration: InputDecoration(
                     labelText: 'Category'.tr(),
                     border: OutlineInputBorder(),
@@ -317,7 +317,7 @@ class _SupportTicketSubmissionPageState
 
 
                 DropdownButtonFormField<String>(
-                  value: _selectedPriority,
+                  initialValue: _selectedPriority,
                   decoration: InputDecoration(
                     labelText: 'Priority'.tr(),
                     border: OutlineInputBorder(),
@@ -412,7 +412,7 @@ class _SupportTicketSubmissionPageState
                             border: Border.all(color: Colors.grey.shade300),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
+                                color: Colors.grey.withValues(alpha: 0.1),
                                 spreadRadius: 1,
                                 blurRadius: 3,
                                 offset: const Offset(0, 1),
@@ -495,7 +495,7 @@ class _SupportTicketSubmissionPageState
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child:  Row(

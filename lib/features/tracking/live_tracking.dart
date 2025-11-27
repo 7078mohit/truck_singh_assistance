@@ -98,7 +98,7 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
   Future<void> _loadTruckIcon() async {
     try {
       final config = createLocalImageConfiguration(context);
-      _truckIcon = await BitmapDescriptor.fromAssetImage(
+      _truckIcon = await BitmapDescriptor.asset(
         config,
         'assets/cargo-truck.png',
       );
@@ -233,7 +233,7 @@ class _LiveTrackingPageState extends State<LiveTrackingPage> {
                 value: _isTrackingEnabled,
                 onChanged: (_) => _toggleTracking(),
                 activeTrackColor: Colors.green.shade200,
-                activeColor: Colors.green,
+                activeThumbColor: Colors.green,
               ),
             ),
         ],

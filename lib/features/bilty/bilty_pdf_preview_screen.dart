@@ -1,11 +1,9 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:logistics_toolkit/config/theme.dart';
 import 'package:pdfx/pdfx.dart';
 
 class BiltyPdfPreviewScreen extends StatefulWidget {
   final String localPath;
-
   const BiltyPdfPreviewScreen({super.key, required this.localPath});
 
   @override
@@ -13,19 +11,13 @@ class BiltyPdfPreviewScreen extends StatefulWidget {
 }
 
 class _BiltyPdfPreviewScreenState extends State<BiltyPdfPreviewScreen> {
-  late PdfControllerPinch _pdfController;
-
-  @override
-  void initState() {
-    super.initState();
-    _pdfController = PdfControllerPinch(
-      document: PdfDocument.openFile(widget.localPath),
-    );
-  }
+  late final PdfControllerPinch _controller = PdfControllerPinch(
+    document: PdfDocument.openFile(widget.localPath),
+  );
 
   @override
   void dispose() {
-    _pdfController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -37,12 +29,14 @@ class _BiltyPdfPreviewScreenState extends State<BiltyPdfPreviewScreen> {
         appBar: AppBar(
           title: Text(
             'Bilty Preview',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: Colors.white),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: Colors.white,
+            ),
           ),
         ),
         body: SafeArea(
           child: PdfViewPinch(
-            controller: _pdfController,
+            controller: _controller,
             scrollDirection: Axis.vertical,
           ),
         ),

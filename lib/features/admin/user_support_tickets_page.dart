@@ -1,7 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
 import 'support_ticket_detail_page.dart';
 import 'support_ticket_submission_page.dart';
 
@@ -248,7 +247,7 @@ class _UserSupportTicketsPageState extends State<UserSupportTicketsPage> {
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: c.withOpacity(0.1),
+        color: c.withValues(alpha: 0.1),
         border: Border.all(color: c)),
     child: Text(t,
         style: TextStyle(color: c, fontWeight: FontWeight.w500)),

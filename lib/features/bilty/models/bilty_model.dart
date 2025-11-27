@@ -1,14 +1,20 @@
-class BiltyModel {
-  final String? id;
-  final String biltyNo;
-  final String consignorName;
-  final String consigneeName;
-  final String origin;
-  final String destination;
+extension JsonSafe on Map<String, dynamic> {
+  T getOr<T>(String key, T fallback) => (this[key] ?? fallback) as T;
+  double getDouble(String key) => (this[key] ?? 0).toDouble();
+  DateTime? getDate(String key) => this[key] != null ? DateTime.parse(this[key]) : null;
+}
+
+/// ---------- BASE MODEL FOR SHARED JSON LOGIC ----------
+mixin JsonModel {
+  Map<String, dynamic> toJson();
+}
+
+/// ------------------ BILTY MODEL -----------------------
+class BiltyModel with JsonModel {
+  final String? id, userId;
+  final String biltyNo, consignorName, consigneeName, origin, destination;
   final double totalFare;
-  final String? userId;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
+  final DateTime? createdAt, updatedAt;
   final Map<String, dynamic> metadata;
 
   BiltyModel({
@@ -25,46 +31,40 @@ class BiltyModel {
     required this.metadata,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'bilty_no': biltyNo,
-      'consignor_name': consignorName,
-      'consignee_name': consigneeName,
-      'origin': origin,
-      'destination': destination,
-      'total_fare': totalFare,
-      'user_id': userId,
-      'created_at': createdAt?.toIso8601String(),
-      'updated_at': updatedAt?.toIso8601String(),
-      'metadata': metadata,
-    };
-  }
+  @override
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'bilty_no': biltyNo,
+    'consignor_name': consignorName,
+    'consignee_name': consigneeName,
+    'origin': origin,
+    'destination': destination,
+    'total_fare': totalFare,
+    'user_id': userId,
+    'created_at': createdAt?.toIso8601String(),
+    'updated_at': updatedAt?.toIso8601String(),
+    'metadata': metadata,
+  };
 
-  factory BiltyModel.fromJson(Map<String, dynamic> json) {
-    return BiltyModel(
-      id: json['id'],
-      biltyNo: json['bilty_no'] ?? '',
-      consignorName: json['consignor_name'] ?? '',
-      consigneeName: json['consignee_name'] ?? '',
-      origin: json['origin'] ?? '',
-      destination: json['destination'] ?? '',
-      totalFare: (json['total_fare'] ?? 0).toDouble(),
-      userId: json['user_id'],
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
-      metadata: json['metadata'] ?? {},
-    );
-  }
+  factory BiltyModel.fromJson(Map<String, dynamic> json) => BiltyModel(
+    id: json['id'],
+    biltyNo: json.getOr('bilty_no', ''),
+    consignorName: json.getOr('consignor_name', ''),
+    consigneeName: json.getOr('consignee_name', ''),
+    origin: json.getOr('origin', ''),
+    destination: json.getOr('destination', ''),
+    totalFare: json.getDouble('total_fare'),
+    userId: json['user_id'],
+    createdAt: json.getDate('created_at'),
+    updatedAt: json.getDate('updated_at'),
+    metadata: json['metadata'] ?? {},
+  );
 }
 
-// Model for consignor/consignee details
-class PartyDetails {
-  final String name;
-  final String address;
-  final String? gstin;
-  final String? phone;
-  final String? email;
+/// ---------------- PARTY DETAILS ----------------
+class PartyDetails with JsonModel {
+  final String name, address;
+  final String? gstin, phone, email;
 
   PartyDetails({
     required this.name,
@@ -74,34 +74,29 @@ class PartyDetails {
     this.email,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'name': name,
-      'address': address,
-      'gstin': gstin,
-      'phone': phone,
-      'email': email,
-    };
-  }
+  @override
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'address': address,
+    'gstin': gstin,
+    'phone': phone,
+    'email': email,
+  };
 
-  factory PartyDetails.fromJson(Map<String, dynamic> json) {
-    return PartyDetails(
-      name: json['name'] ?? '',
-      address: json['address'] ?? '',
-      gstin: json['gstin'],
-      phone: json['phone'],
-      email: json['email'],
-    );
-  }
+  factory PartyDetails.fromJson(Map<String, dynamic> json) => PartyDetails(
+    name: json.getOr('name', ''),
+    address: json.getOr('address', ''),
+    gstin: json['gstin'],
+    phone: json['phone'],
+    email: json['email'],
+  );
 }
 
-// Model for goods/item details
-class GoodsItem {
+/// ---------------- GOODS ITEM ----------------
+class GoodsItem with JsonModel {
   final String description;
   final int quantity;
-  final double weight;
-  final double rate;
-  final double amount;
+  final double weight, rate, amount;
 
   GoodsItem({
     required this.description,
@@ -117,43 +112,37 @@ class GoodsItem {
     double? weight,
     double? rate,
     double? amount,
-  }) {
-    return GoodsItem(
-      description: description ?? this.description,
-      quantity: quantity ?? this.quantity,
-      weight: weight ?? this.weight,
-      rate: rate ?? this.rate,
-      amount: amount ?? this.amount,
-    );
-  }
+  }) =>
+      GoodsItem(
+        description: description ?? this.description,
+        quantity: quantity ?? this.quantity,
+        weight: weight ?? this.weight,
+        rate: rate ?? this.rate,
+        amount: amount ?? this.amount,
+      );
 
-  Map<String, dynamic> toJson() {
-    return {
-      'description': description,
-      'quantity': quantity,
-      'weight': weight,
-      'rate': rate,
-      'amount': amount,
-    };
-  }
+  @override
+  Map<String, dynamic> toJson() => {
+    'description': description,
+    'quantity': quantity,
+    'weight': weight,
+    'rate': rate,
+    'amount': amount,
+  };
 
-  factory GoodsItem.fromJson(Map<String, dynamic> json) {
-    return GoodsItem(
-      description: json['description'] ?? '',
-      quantity: json['quantity'] ?? 0,
-      weight: (json['weight'] ?? 0).toDouble(),
-      rate: (json['rate'] ?? 0).toDouble(),
-      amount: (json['amount'] ?? 0).toDouble(),
-    );
-  }
+  factory GoodsItem.fromJson(Map<String, dynamic> json) => GoodsItem(
+    description: json.getOr('description', ''),
+    quantity: json.getOr('quantity', 0),
+    weight: json.getDouble('weight'),
+    rate: json.getDouble('rate'),
+    amount: json.getDouble('amount'),
+  );
 }
 
-// Model for vehicle and driver details
-class VehicleDetails {
-  final String vehicleNumber;
-  final String driverName;
-  final String? driverPhone;
-  final String? driverLicense;
+/// ---------------- VEHICLE DETAILS ----------------
+class VehicleDetails with JsonModel {
+  final String vehicleNumber, driverName;
+  final String? driverPhone, driverLicense;
 
   VehicleDetails({
     required this.vehicleNumber,
@@ -162,32 +151,26 @@ class VehicleDetails {
     this.driverLicense,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'vehicle_number': vehicleNumber,
-      'driver_name': driverName,
-      'driver_phone': driverPhone,
-      'driver_license': driverLicense,
-    };
-  }
+  @override
+  Map<String, dynamic> toJson() => {
+    'vehicle_number': vehicleNumber,
+    'driver_name': driverName,
+    'driver_phone': driverPhone,
+    'driver_license': driverLicense,
+  };
 
-  factory VehicleDetails.fromJson(Map<String, dynamic> json) {
-    return VehicleDetails(
-      vehicleNumber: json['vehicle_number'] ?? '',
-      driverName: json['driver_name'] ?? '',
-      driverPhone: json['driver_phone'],
-      driverLicense: json['driver_license'],
-    );
-  }
+  factory VehicleDetails.fromJson(Map<String, dynamic> json) => VehicleDetails(
+    vehicleNumber: json.getOr('vehicle_number', ''),
+    driverName: json.getOr('driver_name', ''),
+    driverPhone: json['driver_phone'],
+    driverLicense: json['driver_license'],
+  );
 }
 
-// Model for charges and payment details
-class ChargesDetails {
-  final double basicFare;
-  final double otherCharges;
-  final double gst;
-  final double totalAmount;
-  final String paymentStatus; // "Paid", "To Pay", "Partial"
+/// ---------------- CHARGES DETAILS ----------------
+class ChargesDetails with JsonModel {
+  final double basicFare, otherCharges, gst, totalAmount;
+  final String paymentStatus;
 
   ChargesDetails({
     required this.basicFare,
@@ -197,23 +180,20 @@ class ChargesDetails {
     required this.paymentStatus,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'basic_fare': basicFare,
-      'other_charges': otherCharges,
-      'gst': gst,
-      'total_amount': totalAmount,
-      'payment_status': paymentStatus,
-    };
-  }
+  @override
+  Map<String, dynamic> toJson() => {
+    'basic_fare': basicFare,
+    'other_charges': otherCharges,
+    'gst': gst,
+    'total_amount': totalAmount,
+    'payment_status': paymentStatus,
+  };
 
-  factory ChargesDetails.fromJson(Map<String, dynamic> json) {
-    return ChargesDetails(
-      basicFare: (json['basic_fare'] ?? 0).toDouble(),
-      otherCharges: (json['other_charges'] ?? 0).toDouble(),
-      gst: (json['gst'] ?? 0).toDouble(),
-      totalAmount: (json['total_amount'] ?? 0).toDouble(),
-      paymentStatus: json['payment_status'] ?? 'To Pay',
-    );
-  }
-} 
+  factory ChargesDetails.fromJson(Map<String, dynamic> json) => ChargesDetails(
+    basicFare: json.getDouble('basic_fare'),
+    otherCharges: json.getDouble('other_charges'),
+    gst: json.getDouble('gst'),
+    totalAmount: json.getDouble('total_amount'),
+    paymentStatus: json.getOr('payment_status', 'To Pay'),
+  );
+}

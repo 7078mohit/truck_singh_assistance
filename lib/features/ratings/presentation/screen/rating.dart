@@ -15,21 +15,28 @@ class Rating extends StatefulWidget {
 class _RatingState extends State<Rating> {
   String? currentUserName;
   String? currentUserRole;
+
   String? person1Name;
   String? person1Id;
   String? person1Role;
   double rating1 = 0;
   TextEditingController feedback1 = TextEditingController();
+
   String? person2Name;
   String? person2Id;
   String? person2Role;
   double rating2 = 0;
   TextEditingController feedback2 = TextEditingController();
+
   bool isLoading = true;
-  bool canRate = true;
   final _client = Supabase.instance.client;
 
-  //Submit rating part below
+  @override
+  void initState() {
+    super.initState();
+    _fetchNames().then((_) => fetchExistingRating());
+  }
+
   Future<int> submitRating({
     required String shipmentId,
     required String person1Id,
@@ -39,15 +46,15 @@ class _RatingState extends State<Rating> {
     required String feedback1,
     required String feedback2,
   }) async {
-    final currentUserId = _client.auth.currentUser?.id;
-    if (currentUserId == null) {
+    final currentUser = _client.auth.currentUser;
+    if (currentUser == null) {
       throw Exception(tr("error_user_not_authenticated"));
     }
 
     final profileResponse = await _client
         .from('user_profiles')
         .select('role, custom_user_id')
-        .eq('user_id', currentUserId)
+        .eq('user_id', currentUser.id)
         .maybeSingle();
 
     if (profileResponse == null) {
@@ -68,28 +75,25 @@ class _RatingState extends State<Rating> {
       throw Exception(tr("error_shipment_not_found"));
     }
 
-    final deliveryDate = DateTime.tryParse(
-      shipmentResponse['delivery_date'] ?? '',
-    );
+    final deliveryDate =
+    DateTime.tryParse(shipmentResponse['delivery_date'] ?? "");
 
-    final bool isRatingPeriodExpired =
-        deliveryDate != null &&
-            DateTime.now().isAfter(deliveryDate.add(const Duration(days: 7)));
+    final isExpired = deliveryDate != null &&
+        DateTime.now().isAfter(deliveryDate.add(const Duration(days: 7)));
 
-    if (isRatingPeriodExpired) {
-      throw Exception('ratingPeriodExpired'.tr());
-    }
+    if (isExpired) throw Exception("ratingPeriodExpired".tr());
 
     final driverId = shipmentResponse['assigned_driver'] as String?;
     final assignedId = shipmentResponse['assigned_agent'] as String?;
     final shipperId = shipmentResponse['shipper_id'] as String?;
 
-    final List<Map<String, dynamic>> ratingsToSubmit = [];
+    final List<Map<String, dynamic>> toSubmit = [];
 
+    // SAME LOGIC: null-safe
     switch (currentUserRole) {
       case 'shipper':
         if (driverId != null) {
-          ratingsToSubmit.add({
+          toSubmit.add({
             'shipment_id': shipmentId,
             'rater_id': currentUserCustomId,
             'ratee_id': driverId,
@@ -100,7 +104,7 @@ class _RatingState extends State<Rating> {
           });
         }
         if (assignedId != null && assignedId != shipperId) {
-          ratingsToSubmit.add({
+          toSubmit.add({
             'shipment_id': shipmentId,
             'rater_id': currentUserCustomId,
             'ratee_id': assignedId,
@@ -111,57 +115,60 @@ class _RatingState extends State<Rating> {
           });
         }
         break;
+
       case 'agent':
         if (driverId != null) {
-          ratingsToSubmit.add({
+          toSubmit.add({
             'shipment_id': shipmentId,
             'rater_id': currentUserCustomId,
             'ratee_id': driverId,
-            'rater_role': 'Shipper',
+            'rater_role': 'Agent',
             'ratee_role': 'Driver',
             'rating': rating1.round(),
             'feedback': feedback1.isNotEmpty ? feedback1 : null,
           });
         }
-        if (shipperId != null && shipperId != assignedId) {
-          ratingsToSubmit.add({
+        if (shipperId != null) {
+          toSubmit.add({
             'shipment_id': shipmentId,
             'rater_id': currentUserCustomId,
             'ratee_id': shipperId,
             'rater_role': 'Agent',
             'ratee_role': 'Shipper',
-            'rating': rating1.round(),
-            'feedback': feedback1.isNotEmpty ? feedback1 : null,
+            'rating': rating2.round(),
+            'feedback': feedback2.isNotEmpty ? feedback2 : null,
           });
         }
         break;
+
       case 'truckowner':
         if (driverId != null) {
-          ratingsToSubmit.add({
+          toSubmit.add({
             'shipment_id': shipmentId,
             'rater_id': currentUserCustomId,
             'ratee_id': driverId,
-            'rater_role': 'Shipper',
+            'rater_role': 'TruckOwner',
             'ratee_role': 'Driver',
             'rating': rating1.round(),
             'feedback': feedback1.isNotEmpty ? feedback1 : null,
           });
         }
-        if (shipperId != null && shipperId != assignedId) {
-          ratingsToSubmit.add({
+        if (shipperId != null) {
+          toSubmit.add({
             'shipment_id': shipmentId,
             'rater_id': currentUserCustomId,
             'ratee_id': shipperId,
-            'rater_role': 'Agent',
+            'rater_role': 'TruckOwner',
             'ratee_role': 'Shipper',
-            'rating': rating1.round(),
-            'feedback': feedback1.isNotEmpty ? feedback1 : null,
+            'rating': rating2.round(),
+            'feedback': feedback2.isNotEmpty ? feedback2 : null,
           });
         }
         break;
+
       case 'driver':
         if (shipperId != null) {
-          ratingsToSubmit.add({
+          toSubmit.add({
             'shipment_id': shipmentId,
             'rater_id': currentUserCustomId,
             'ratee_id': shipperId,
@@ -171,311 +178,314 @@ class _RatingState extends State<Rating> {
             'feedback': feedback1.isNotEmpty ? feedback1 : null,
           });
         }
-        if (assignedId != null && assignedId != shipperId) {
-          ratingsToSubmit.add({
+        if (assignedId != null) {
+          toSubmit.add({
             'shipment_id': shipmentId,
             'rater_id': currentUserCustomId,
             'ratee_id': assignedId,
-            'rater_role': 'Shipper',
+            'rater_role': 'Driver',
             'ratee_role': 'Agent',
             'rating': rating2.round(),
             'feedback': feedback2.isNotEmpty ? feedback2 : null,
           });
         }
         break;
-      default:
-        throw Exception("${tr("error_invalid_role")}: $currentUserRole");
     }
 
-    if (ratingsToSubmit.isEmpty) {
+    if (toSubmit.isEmpty) {
       throw Exception(tr("error_no_ratings_to_submit"));
     }
 
-    int finalEditCount = 0;
-    for (final rating in ratingsToSubmit) {
-      final existingRating = await _client
+    int finalEdit = 0;
+
+    for (final r in toSubmit) {
+      final existing = await _client
           .from('ratings')
           .select('edit_count')
-          .eq('shipment_id', rating['shipment_id'])
-          .eq('rater_id', rating['rater_id'])
-          .eq('ratee_id', rating['ratee_id'])
+          .eq('shipment_id', r['shipment_id'])
+          .eq('rater_id', r['rater_id'])
+          .eq('ratee_id', r['ratee_id'])
           .maybeSingle();
 
-      int currentEditCount = existingRating?['edit_count'] as int? ?? 0;
+      final count = (existing?['edit_count'] as int? ?? 0) + 1;
 
-      final newEditCount = currentEditCount + 1;
-      finalEditCount = newEditCount;
+      if (count > 3) throw Exception(tr("error_edit_limit_reached"));
 
-      if (newEditCount > 3) {
-        throw Exception(tr("error_edit_limit_reached"));
-      }
+      r['edit_count'] = count;
+      finalEdit = count;
 
-      rating['edit_count'] = newEditCount;
-
-      final upsertResponse = await _client
+      await _client
           .from('ratings')
-          .upsert(rating, onConflict: 'shipment_id, rater_id, ratee_id')
+          .upsert(r, onConflict: 'shipment_id,rater_id,ratee_id')
           .select();
-
-      debugPrint("Upsert result: $upsertResponse");
     }
 
-    return finalEditCount;
+    return finalEdit;
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchNames().then((_) {
-      fetchExistingRating();
-    });
-  }
   Future<void> _fetchNames() async {
     try {
-      final userId = _client.auth.currentUser?.id;
-      if (userId == null) throw Exception(tr("error_no_logged_in_user"));
+      final currentUser = _client.auth.currentUser;
+      if (currentUser == null) throw Exception(tr("error_no_logged_in_user"));
+
       final currentProfile = await _client
           .from('user_profiles')
           .select('custom_user_id, name, role')
-          .eq('user_id', userId)
-          .single();
-      currentUserName = currentProfile['name'];
-      currentUserRole = (currentProfile['role'] as String?)?.trim().toLowerCase();
-      final currentUserCustomId = currentProfile['custom_user_id'];
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+      currentUserName = currentProfile?['name'];
+      currentUserRole =
+          (currentProfile?['role'] as String?)?.trim().toLowerCase();
+
       final shipment = await _client
           .from('shipment')
           .select('shipper_id, assigned_driver, assigned_agent')
           .eq('shipment_id', widget.shipmentId)
-          .single();
-      final shipperId = shipment['shipper_id'] as String?;
-      final driverId = shipment['assigned_driver'] as String?;
-      final assignedId = shipment['assigned_agent'] as String?;
+          .maybeSingle();
+
+      final shipperId = shipment?['shipper_id'];
+      final driverId = shipment?['assigned_driver'];
+      final agentId = shipment?['assigned_agent'];
+
       Future<String?> getName(String? id) async {
         if (id == null) return null;
-        final profile = await _client
+        final res = await _client
             .from('user_profiles')
             .select('name')
             .eq('custom_user_id', id)
             .maybeSingle();
-        return profile?['name'];
+        return res?['name'];
       }
+
       final shipperName = await getName(shipperId);
       final driverName = await getName(driverId);
-      final assignedName = await getName(assignedId);
+      final agentName = await getName(agentId);
+
       switch (currentUserRole) {
         case 'shipper':
           person1Name = driverName;
           person1Id = driverId;
-          person1Role = tr('driver');
-          if (assignedId != null && assignedId != currentUserCustomId) {
-            person2Name = assignedName;
-            person2Id = assignedId;
-            person2Role = tr('agent');
+          person1Role = tr("driver");
+
+          if (agentId != shipperId) {
+            person2Name = agentName;
+            person2Id = agentId;
+            person2Role = tr("agent");
           }
           break;
 
         case 'agent':
           person1Name = driverName;
           person1Id = driverId;
-          person1Role = tr('driver');
-          if (shipperId != null && shipperId != currentUserCustomId) {
-            person2Name = shipperName;
-            person2Id = shipperId;
-            person2Role = tr('shipper');
-          }
+          person1Role = tr("driver");
+
+          person2Name = shipperName;
+          person2Id = shipperId;
+          person2Role = tr("shipper");
           break;
 
         case 'truckowner':
           person1Name = driverName;
           person1Id = driverId;
-          person1Role = tr('driver');
-          if (shipperId != null && shipperId != currentUserCustomId) {
-            person2Name = shipperName;
-            person2Id = shipperId;
-            person2Role = tr('shipper');
-          }
+          person1Role = tr("driver");
+
+          person2Name = shipperName;
+          person2Id = shipperId;
+          person2Role = tr("shipper");
           break;
 
         case 'driver':
           person1Name = shipperName;
           person1Id = shipperId;
-          person1Role = tr('shipper');
-          if (assignedId != null && assignedId != shipperId) {
-            person2Name = assignedName;
-            person2Id = assignedId;
-            person2Role = tr('agent');
+          person1Role = tr("shipper");
+
+          if (agentId != shipperId) {
+            person2Name = agentName;
+            person2Id = agentId;
+            person2Role = tr("agent");
           }
           break;
       }
 
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     } catch (e) {
-      debugPrint("Error fetching names: $e");
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+      debugPrint("Error _fetchNames: $e");
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   Future<void> fetchExistingRating() async {
     try {
-      final currentUserId = _client.auth.currentUser?.id;
-      if (currentUserId == null) return;
+      final user = _client.auth.currentUser;
+      if (user == null) return;
 
       final profile = await _client
           .from('user_profiles')
           .select('custom_user_id')
-          .eq('user_id', currentUserId)
+          .eq('user_id', user.id)
           .maybeSingle();
 
-      if (profile == null) return;
-      final currentUserCustomId = profile['custom_user_id'];
+      final customId = profile?['custom_user_id'];
+      if (customId == null) return;
 
-      final shipmentResponse = await _client
-          .from('shipment')
-          .select('assigned_driver, assigned_agent, shipper_id, delivery_date')
-          .eq('shipment_id', widget.shipmentId)
-          .maybeSingle();
-
-      final deliveryDate = DateTime.tryParse(
-        shipmentResponse?['delivery_date'] ?? '',
-      );
-
-      canRate = deliveryDate != null &&
-          !DateTime.now().isAfter(deliveryDate.add(const Duration(days: 7)));
-
-      final existingRatings = await _client
+      final response = await _client
           .from('ratings')
-          .select('ratee_id,rating,feedback,edit_count')
+          .select('ratee_id,rating,feedback')
           .eq('shipment_id', widget.shipmentId)
-          .eq('rater_id', currentUserCustomId);
+          .eq('rater_id', customId);
 
-      for (var r in existingRatings) {
-        if (r['ratee_id'] == person1Id) {
-          rating1 = (r['rating'] as num?)?.toDouble() ?? 0;
-          feedback1.text = r['feedback'] ?? '';
-        } else if (r['ratee_id'] == person2Id) {
-          rating2 = (r['rating'] as num?)?.toDouble() ?? 0;
-          feedback2.text = r['feedback'] ?? '';
-        }
-        if(r['edit_count'] > 3) {
-          canRate = false;
+      for (final r in response) {
+        final rateeId = r['ratee_id'];
+
+        if (rateeId == person1Id) {
+          rating1 = (r['rating'] ?? 0).toDouble();
+          feedback1.text = r['feedback'] ?? "";
+        } else if (rateeId == person2Id) {
+          rating2 = (r['rating'] ?? 0).toDouble();
+          feedback2.text = r['feedback'] ?? "";
         }
       }
-      setState(() {});
+
+      if (mounted) setState(() {});
     } catch (e) {
-      debugPrint("Error fetching existing ratings: $e");
+      debugPrint("Error existing rating: $e");
     }
+  }
+
+  Widget shimmerBox(double h, double w) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Container(
+        height: h,
+        width: w,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
+  Widget buildShimmerSkeleton() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        shimmerBox(28, 200),
+        const SizedBox(height: 20),
+        shimmerBox(60, double.infinity),
+        const SizedBox(height: 16),
+        shimmerBox(24, 150),
+      ],
+    );
   }
 
   void _handleSubmitRating() async {
     try {
-      final updatedEditCount = await submitRating(
+      final editCount = await submitRating(
         shipmentId: widget.shipmentId,
-        person1Id: person1Id ?? '',
-        person2Id: person2Id ?? '',
+        person1Id: person1Id ?? "",
+        person2Id: person2Id ?? "",
         rating1: rating1,
         rating2: rating2,
         feedback1: feedback1.text,
         feedback2: feedback2.text,
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr("ratings_submitted_successfully"))),
-      );
-      Navigator.pop(context, updatedEditCount);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(tr("ratings_submitted_successfully"))),
+        );
+      }
+
+      Navigator.pop(context, editCount);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('${tr("error")}: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${tr("error")}: $e")),
+        );
+      }
     }
   }
 
-  Widget buildShimmerSkeleton() {
-    return ListView(
-      padding: const EdgeInsets.all(20.0),
-      children: [
-        shimmerBox(
-          height: 28,
-          width: 200,
-          margin: const EdgeInsets.only(bottom: 18),
-        ),
-        shimmerBox(
-          height: 60,
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 6),
-        ),
-        const SizedBox(height: 10),
-        shimmerBox(
-          height: 20,
-          width: 150,
-          margin: const EdgeInsets.only(bottom: 8),
-        ),
-        shimmerStars(),
-        shimmerBox(
-          height: 70,
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 24),
-        ),
-        const SizedBox(height: 20),
-        shimmerBox(
-          height: 20,
-          width: 150,
-          margin: const EdgeInsets.only(bottom: 8),
-        ),
-        shimmerStars(),
-        shimmerBox(
-          height: 70,
-          width: double.infinity,
-          margin: const EdgeInsets.only(bottom: 24),
-        ),
-        const SizedBox(height: 10),
-        shimmerBox(
-          height: 48,
-          width: double.infinity,
-          margin: EdgeInsets.zero,
-          borderRadius: 24,
-        ),
-      ],
-    );
-  }
-
-  Widget shimmerBox({
-    required double height,
-    required double width,
-    required EdgeInsets margin,
-    double borderRadius = 8.0,
-  }) {
-    return Shimmer.fromColors(
-      baseColor: Colors.grey.shade300,
-      highlightColor: Colors.grey.shade100,
-      child: Container(
-        height: height,
-        width: width,
-        margin: margin,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(borderRadius),
-        ),
-      ),
-    );
-  }
-
-  Widget shimmerStars() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Row(
-        children: List.generate(5, (_) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: shimmerBox(
-              height: 24,
-              width: 24,
-              margin: EdgeInsets.zero,
-              borderRadius: 12,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(tr("rate_shipment"))),
+      body: isLoading
+          ? buildShimmerSkeleton()
+          : Padding(
+        padding: const EdgeInsets.all(16),
+        child: ListView(
+          children: [
+            Text(
+              "${tr('hello')} ${currentUserName ?? ''},",
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold),
             ),
-          );
-        }),
+
+            const SizedBox(height: 8),
+            Text(tr("please_rate_your_experience")),
+            const Divider(height: 32),
+
+            // PERSON 1
+            if (person1Name != null) ...[
+              Text(
+                "${tr("rate")} $person1Name (${person1Role ?? ''})",
+                style: const TextStyle(fontSize: 16),
+              ),
+              RatingBar.builder(
+                initialRating: rating1,
+                minRating: 1,
+                itemBuilder: (_, __) =>
+                const Icon(Icons.star, color: Colors.amber),
+                onRatingUpdate: (r) => setState(() => rating1 = r),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: feedback1,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: "${tr("feedback_for")} $person1Name",
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 28),
+            ],
+            // PERSON 2
+            if (person2Name != null) ...[
+              Text(
+                "${tr("rate")} $person2Name (${person2Role ?? ''})",
+                style: const TextStyle(fontSize: 16),
+              ),
+              RatingBar.builder(
+                initialRating: rating2,
+                minRating: 1,
+                itemBuilder: (_, __) =>
+                const Icon(Icons.star, color: Colors.amber),
+                onRatingUpdate: (r) => setState(() => rating2 = r),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: feedback2,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: "${tr("feedback_for")} $person2Name",
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 28),
+            ],
+            Center(
+              child: FilledButton.icon(
+                onPressed: _handleSubmitRating,
+                icon: const Icon(Icons.send),
+                label: Text(tr("submit_ratings")),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -485,89 +495,5 @@ class _RatingState extends State<Rating> {
     feedback1.dispose();
     feedback2.dispose();
     super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (isLoading) {
-      return Scaffold(
-        appBar: AppBar(title: Text(tr("rate_shipment"))),
-        body: buildShimmerSkeleton(),
-      );
-    }
-    return Scaffold(
-      appBar: AppBar(title: Text(tr("rate_shipment"))),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            Text(
-              "${"hello".tr()} ${currentUserName ?? ''},",
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Text("please_rate_your_experience".tr()),
-            const Divider(height: 30),
-            if (person1Name != null) ...[
-              Text("${tr("rate")} ${person1Name!} (${person1Role!})",
-                  style: const TextStyle(fontSize: 16)),
-              RatingBar.builder(
-                initialRating: rating1,
-                minRating: 1,
-                itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
-                onRatingUpdate: (rating) => setState(() => rating1 = rating),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: feedback1,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  labelText: "${'feedback_for'.tr() + person1Name!}",
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
-            if (person2Name != null) ...[
-              Text("${tr("rate")} ${person2Name!} (${person2Role!})",
-                  style: const TextStyle(fontSize: 16)),
-              RatingBar.builder(
-                initialRating: rating2,
-                minRating: 1,
-                itemBuilder: (context, _) => const Icon(Icons.star, color: Colors.amber),
-                onRatingUpdate: (rating) => setState(() => rating2 = rating),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: feedback2,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  labelText: "${tr("feedback_for")} ${person2Name!}",
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 30),
-            ],
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: canRate ?
-                _handleSubmitRating
-                    : () {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('${tr("rating_expired")}')));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: canRate ? Colors.orange : Colors.grey,
-                  foregroundColor: canRate ? Colors.white : Colors.white70,
-                ),
-                icon: const Icon(Icons.send),
-                label: Text(tr("submit_ratings")),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

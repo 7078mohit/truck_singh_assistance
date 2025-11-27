@@ -199,15 +199,22 @@ class _TrackTrucksPageState extends State<TrackTrucksPage> {
         return AlertDialog(
           title: const Text('Driver Display Limit'),
           content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: limits.map((limit) {
-              return RadioListTile<int?>(
-                title: Text(limit.toString()),
-                value: limit,
-                groupValue: _fetchLimit,
-                onChanged: (value) => Navigator.of(context).pop(value),
-              );
-            }).toList(),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioGroup<int>(
+                  groupValue: _fetchLimit,
+                  onChanged: (value) => Navigator.of(context).pop(value),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: limits.map((limit) {
+                      return RadioListTile<int>(
+                        title: Text(limit.toString()),
+                        value: limit??0,
+                      );
+                    }).toList(),
+                  ),
+                )
+              ]
           ),
           actions: [
             TextButton(
@@ -350,7 +357,7 @@ class _TrackTrucksPageState extends State<TrackTrucksPage> {
               Center(
                 child: Container(
                   padding: const EdgeInsets.all(16),
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   child: Text(
                     _errorMessage!,
                     style: const TextStyle(

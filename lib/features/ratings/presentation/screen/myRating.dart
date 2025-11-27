@@ -40,12 +40,12 @@ class _RatingState extends State<Rating> {
   String? companyName;
   String? shipperName;
   String? agentName;
+
   int editCount = 0;
 
   @override
   void initState() {
     super.initState();
-
     switch (widget.userRole.toLowerCase()) {
       case 'shipper':
         label1 = "driver".tr();
@@ -65,9 +65,7 @@ class _RatingState extends State<Rating> {
     }
 
     fetchAssignedName();
-    fetchEditCount().then((_) {
-      fetchExistingRating();
-    });
+    fetchEditCount().then((_) => fetchExistingRating());
     fetchDeliveryInfo();
   }
 
@@ -76,58 +74,60 @@ class _RatingState extends State<Rating> {
 
     final shipment = await supabase
         .from('view_shipment_updates')
-        .select('assigned_driver, assigned_agent, assigned_company')
+        .select('assigned_driver, assigned_agent, assigned_company, assigned_shipper')
         .eq('shipment_id', widget.shipmentId)
         .maybeSingle();
 
-    final assignedDriverId = shipment?['assigned_driver']?.toString();
-    final assignedShipperId = shipment?['assigned_driver']?.toString();
-    final assignedAgentId = shipment?['assigned_agent']?.toString();
-    final assignedCompanyId = shipment?['assigned_company']?.toString();
+    final driverId = shipment?['assigned_driver']?.toString();
+    final agentId = shipment?['assigned_agent']?.toString();
+    final companyId = shipment?['assigned_company']?.toString();
+    final shipperId = shipment?['assigned_shipper']?.toString();
 
-    Future<String> getNameFromCustomId(String? customId) async {
-      if (customId == null || customId.trim().isEmpty) return 'N/A';
+    Future<String?> getName(String? id) async {
+      if (id == null || id.trim().isEmpty) return null;
 
       final res = await supabase
           .from('user_profiles')
           .select('name')
-          .eq('custom_user_id', customId.trim())
+          .eq('custom_user_id', id.trim())
           .maybeSingle();
 
-      return res != null && res['name'] != null
-          ? res['name'] as String
-          : 'Unknown';
+      return res?['name'] as String?;
     }
 
-    final driver = await getNameFromCustomId(assignedDriverId);
-    final shipper = await getNameFromCustomId(assignedShipperId);
-    final agent = await getNameFromCustomId(assignedAgentId);
-    final company = await getNameFromCustomId(assignedCompanyId);
+    final dName = await getName(driverId);
+    final sName = await getName(shipperId);
+    final aName = await getName(agentId);
+    final cName = await getName(companyId);
 
     setState(() {
-      driverName = driver;
-      shipperName = shipper;
-      agentName = agent;
-      companyName = company;
+      driverName = dName;
+      shipperName = sName;
+      agentName = aName;
+      companyName = cName;
     });
   }
 
   Future<void> fetchDeliveryInfo() async {
-    final response = await Supabase.instance.client
+    final res = await Supabase.instance.client
         .from('view_shipment_updates')
         .select('delivery_date, booking_status')
         .eq('shipment_id', widget.shipmentId)
         .maybeSingle();
 
-    if (response != null) {
-      final delivery = response['delivery_date'];
-      final status = response['booking_status'];
+    if (res != null) {
+      final delivery = res['delivery_date'];
+      final status = res['booking_status'];
+
       setState(() {
         bookingStatus = status;
+
         if (delivery != null) {
-          deliveryDate = DateTime.parse(delivery);
-          final diff = DateTime.now().difference(deliveryDate!).inDays;
-          isWithin3Days = diff < 3;
+          deliveryDate = DateTime.tryParse(delivery);
+          if (deliveryDate != null) {
+            final diff = DateTime.now().difference(deliveryDate!).inDays;
+            isWithin3Days = diff < 3;
+          }
         }
       });
     }
@@ -153,6 +153,7 @@ class _RatingState extends State<Rating> {
           feedback2.text = data['agent_feedback_by_shipper'] ?? '';
         });
         break;
+
       case 'driver':
         setState(() {
           rating1 = (data['shipper_rating_by_driver'] ?? 0).toDouble();
@@ -161,6 +162,7 @@ class _RatingState extends State<Rating> {
           feedback2.text = data['agent_feedback_by_driver'] ?? '';
         });
         break;
+
       case 'agent':
         setState(() {
           rating1 = (data['shipper_rating_by_agent'] ?? 0).toDouble();
@@ -173,14 +175,14 @@ class _RatingState extends State<Rating> {
   }
 
   Future<void> fetchEditCount() async {
-    final response = await Supabase.instance.client
+    final res = await Supabase.instance.client
         .from('shipment_reviews')
         .select('edit_count')
         .eq('shipment_id', widget.shipmentId)
         .maybeSingle();
 
     setState(() {
-      editCount = (response?['edit_count'] ?? 0) as int;
+      editCount = (res?['edit_count'] ?? 0) as int;
     });
   }
 
@@ -193,6 +195,7 @@ class _RatingState extends State<Rating> {
     }
 
     final supabase = Supabase.instance.client;
+
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     final Map<String, dynamic> ratingData = {
@@ -212,12 +215,14 @@ class _RatingState extends State<Rating> {
         ratingData['agent_rating_by_shipper'] = rating2.toInt();
         ratingData['agent_feedback_by_shipper'] = feedback2.text;
         break;
+
       case 'driver':
         ratingData['shipper_rating_by_driver'] = rating1.toInt();
         ratingData['shipper_feedback_by_driver'] = feedback1.text;
         ratingData['agent_rating_by_driver'] = rating2.toInt();
         ratingData['agent_feedback_by_driver'] = feedback2.text;
         break;
+
       case 'agent':
         ratingData['shipper_rating_by_agent'] = rating1.toInt();
         ratingData['shipper_feedback_by_agent'] = feedback1.text;
@@ -229,7 +234,7 @@ class _RatingState extends State<Rating> {
     try {
       await supabase.from('shipment_reviews').upsert(ratingData);
 
-      if (context.mounted) {
+      if (mounted) {
         Navigator.pop(context, editCount + 1);
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -237,17 +242,12 @@ class _RatingState extends State<Rating> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("error_occurred".tr(args: [e.toString()]))),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("error_occurred".tr(args: [e.toString()]))),
+        );
+      }
     }
-  }
-
-  @override
-  void dispose() {
-    feedback1.dispose();
-    feedback2.dispose();
-    super.dispose();
   }
 
   @override
@@ -256,7 +256,7 @@ class _RatingState extends State<Rating> {
 
     final name1 = widget.userRole.toLowerCase() == 'shipper'
         ? driverName
-        : (widget.userRole.toLowerCase() == 'manager'
+        : (widget.userRole.toLowerCase() == 'driver'
         ? shipperName
         : shipperName);
 
@@ -269,10 +269,6 @@ class _RatingState extends State<Rating> {
     return Scaffold(
       appBar: AppBar(
         title: Text("ratings".tr()),
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back),
-        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -283,6 +279,7 @@ class _RatingState extends State<Rating> {
                 style: const TextStyle(
                     fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
+
             Text("shipment_id".tr(args: [widget.shipmentId])),
             Text("assigned_driver"
                 .tr(args: [driverName ?? widget.assignedDriver ?? 'N/A'])),
@@ -290,19 +287,19 @@ class _RatingState extends State<Rating> {
                 .tr(args: [agentName ?? widget.assignedAgent ?? 'N/A'])),
             Text("assigned_company"
                 .tr(args: [companyName ?? widget.assignedCompany ?? 'N/A'])),
-            const SizedBox(height: 8),
+
             const Divider(),
             const SizedBox(height: 24),
+
+            // PERSON 1
             Text("rate_person".tr(args: [name1 ?? label1]),
                 style: const TextStyle(fontSize: 18)),
             RatingBar.builder(
               initialRating: rating1,
               minRating: 1,
-              itemCount: 5,
-              itemBuilder: (context, _) =>
+              itemBuilder: (_, __) =>
               const Icon(Icons.star, color: Colors.amber),
-              onRatingUpdate: (rating) =>
-                  setState(() => rating1 = rating),
+              onRatingUpdate: (r) => setState(() => rating1 = r),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -313,17 +310,18 @@ class _RatingState extends State<Rating> {
               ),
               maxLines: 2,
             ),
+
             const SizedBox(height: 30),
+
+            // PERSON 2
             Text("rate_person".tr(args: [name2 ?? label2]),
                 style: const TextStyle(fontSize: 18)),
             RatingBar.builder(
               initialRating: rating2,
               minRating: 1,
-              itemCount: 5,
-              itemBuilder: (context, _) =>
+              itemBuilder: (_, __) =>
               const Icon(Icons.star, color: Colors.amber),
-              onRatingUpdate: (rating) =>
-                  setState(() => rating2 = rating),
+              onRatingUpdate: (r) => setState(() => rating2 = r),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -334,14 +332,18 @@ class _RatingState extends State<Rating> {
               ),
               maxLines: 2,
             ),
+
             const SizedBox(height: 30),
+
             ElevatedButton(
               onPressed: isEditDisabled ? null : submitRating,
-              child: Text(isEditDisabled
-                  ? "edit_limit".tr()
-                  : (editCount > 0
-                  ? "edit_rating".tr()
-                  : "submit".tr())),
+              child: Text(
+                isEditDisabled
+                    ? "edit_limit".tr()
+                    : (editCount > 0
+                    ? "edit_rating".tr()
+                    : "submit".tr()),
+              ),
             ),
           ],
         )
@@ -356,5 +358,12 @@ class _RatingState extends State<Rating> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    feedback1.dispose();
+    feedback2.dispose();
+    super.dispose();
   }
 }

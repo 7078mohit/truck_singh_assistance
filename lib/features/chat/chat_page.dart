@@ -1,16 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../services/chat_service.dart';
-import 'dart:async';
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../../services/chat_service.dart';
 
 class ChatPage extends StatefulWidget {
-  final String roomId;
-  final String chatTitle;
+  final String roomId, chatTitle;
 
   const ChatPage({super.key, required this.roomId, required this.chatTitle});
 
@@ -19,496 +17,245 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  final ChatService _chatService = ChatService();
-  final TextEditingController _messageController = TextEditingController();
-  late final Stream<List<Map<String, dynamic>>> _messagesStream;
-  String? _currentCustomUserId;
-  bool _isUploading = false;
+  final _chat = ChatService();
+  final _controller = TextEditingController();
+  late Stream<List<Map<String, dynamic>>> _messages;
+  String? _userId;
+  bool uploading = false;
 
   @override
   void initState() {
     super.initState();
-    _messagesStream = _chatService.getMessagesStream(widget.roomId);
-    _loadCurrentUser();
-    // Mark the room as read when the user enters
-    _chatService.markRoomAsRead(widget.roomId);
+    _messages = _chat.getMessagesStream(widget.roomId);
+    _init();
+    _chat.markRoomAsRead(widget.roomId);
   }
 
-  Future<void> _loadCurrentUser() async {
-    _currentCustomUserId = await _chatService.getCurrentCustomUserId();
-    if (mounted) {
-      setState(() {});
-    }
+  Future<void> _init() async {
+    _userId = await _chat.getCurrentCustomUserId();
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _messageController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  Future<void> _refreshMessages() async {
-    await _chatService.markRoomAsRead(widget.roomId);
-    setState(() {
-      _messagesStream = _chatService.getMessagesStream(widget.roomId);
-    });
-    await Future.delayed(const Duration(milliseconds: 300));
+  void _send() {
+    if (_controller.text.trim().isNotEmpty) {
+      _chat.sendMessage(
+        roomId: widget.roomId,
+        content: _controller.text.trim(),
+      );
+      _controller.clear();
+    }
   }
 
-  void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
-    _chatService.sendMessage(
-      roomId: widget.roomId,
-      content: _messageController.text.trim(),
-    );
-    _messageController.clear();
-  }
-
-  // Shows a bottom sheet with upload options
-  void _showAttachmentOptions() {
+  // ---------------- Attachments ----------------
+  void _pickAttachment() {
     showModalBottomSheet(
       context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Wrap(
-            children: <Widget>[
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: Text('take_photo_pod'.tr()),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _handleCamera();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: Text('choose_gallery'.tr()),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _handleGallery();
-                },
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _option(Icons.camera_alt, 'take_photo_pod'.tr(), _pickCamera),
+            _option(Icons.photo_library, 'choose_gallery'.tr(), _pickGallery),
+          ],
+        ),
+      ),
     );
   }
 
-  // Handles taking a picture with the camera
-  Future<void> _handleCamera() async {
-    final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(
+  ListTile _option(IconData icon, String text, Function action) => ListTile(
+    leading: Icon(icon),
+    title: Text(text),
+    onTap: () {
+      Navigator.pop(context);
+      action();
+    },
+  );
+
+  Future<void> _pickCamera() async {
+    final img = await ImagePicker().pickImage(
       source: ImageSource.camera,
       imageQuality: 60,
     );
-    if (image != null) {
-      _handleFileUpload(
-        File(image.path),
-        image.name,
-        caption: 'proof_of_delivery'.tr(),
-      );
-    }
+    if (img != null)
+      _upload(File(img.path), img.name, caption: "proof_of_delivery".tr());
   }
 
-  // Handles picking a file from the gallery
-  Future<void> _handleGallery() async {
+  Future<void> _pickGallery() async {
     final result = await FilePicker.platform.pickFiles();
-    if (result != null && result.files.single.path != null) {
-      final file = result.files.single;
-      _handleFileUpload(File(file.path!), file.name);
+    if (result?.files.single.path case final path?) {
+      _upload(File(path), result!.files.single.name);
     }
   }
 
-  // Generic file upload handler
-  Future<void> _handleFileUpload(
-      File file,
-      String fileName, {
-        String? caption,
-      }) async {
-    setState(() => _isUploading = true);
+  Future<void> _upload(File file, String name, {String? caption}) async {
+    setState(() => uploading = true);
     try {
-      // We pass the raw file and name to the service now
-      await _chatService.sendAttachment(
+      await _chat.sendAttachment(
         roomId: widget.roomId,
         file: file,
-        fileName: fileName,
+        fileName: name,
         caption: caption,
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('error_uploading_file $e')));
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isUploading = false);
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("${'error_uploading_file'.tr()} $e")),
+      );
     }
+    setState(() => uploading = false);
   }
 
+  // ---------------- UI ----------------
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.chatTitle),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _messagesStream,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting ||
-                    _currentCustomUserId == null) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return RefreshIndicator(
-                    onRefresh: _refreshMessages,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: SizedBox(
-                        height: MediaQuery.of(context).size.height * 0.6,
-                        child: Center(child: Text('no_messages'.tr())),
-                      ),
-                    ),
-                  );
-                }
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(widget.chatTitle)),
+    body: Column(
+      children: [
+        Expanded(child: _userId == null ? _loading() : _stream()),
+        if (uploading) const LinearProgressIndicator(),
+        _inputField(),
+      ],
+    ),
+  );
 
-                final messages = snapshot.data!;
+  Widget _loading() => const Center(child: CircularProgressIndicator());
 
-                return RefreshIndicator(
-                  onRefresh: _refreshMessages,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    reverse: true,
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final message = messages[index];
-                      final isMine =
-                          message['sender_id'] == _currentCustomUserId;
-                      final senderProfile =
-                          message['sender'] as Map<String, dynamic>? ?? {};
-                      final senderName =
-                          senderProfile['name'] as String? ?? 'Unknown';
-                      final senderRole = senderProfile['role'] as String? ?? '';
-                      final timestamp = message['created_at'] as String?;
-                      final messageType = message['message_type'] ?? 'text';
-                      final attachmentUrl = message['attachment_url'];
-                      final content = message['content'] as String? ?? '';
+  Widget _stream() => StreamBuilder(
+    stream: _messages,
+    builder: (_, snap) {
+      if (snap.connectionState == ConnectionState.waiting) return _loading();
+      if (!snap.hasData || snap.data!.isEmpty) {
+        return Center(child: Text("no_messages".tr()));
+      }
 
-                      if (messageType == 'attachment' &&
-                          attachmentUrl != null) {
-                        return _AttachmentBubble(
-                          url: attachmentUrl,
-                          caption: content,
-                          isMine: isMine,
-                          senderName: senderName,
-                          senderRole: senderRole,
-                          timestamp: timestamp,
-                        );
-                      }
+      final msgs = snap.data!;
+      return ListView.builder(
+        reverse: true,
+        padding: const EdgeInsets.all(12),
+        itemCount: msgs.length,
+        itemBuilder: (_, i) => _message(msgs[i]),
+      );
+    },
+  );
 
-                      return _MessageBubble(
-                        message: content,
-                        isMine: isMine,
-                        senderName: isMine ? 'You' : senderName,
-                        senderRole: senderRole,
-                        timestamp: timestamp,
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
+  Widget _message(Map msg) {
+    final mine = msg['sender_id'] == _userId;
+    final name = mine ? "You" : msg['sender']?['name'] ?? "Unknown";
+    final time = _formatTime(msg['created_at']);
+    final isFile = msg['message_type'] == "attachment";
+
+    return Column(
+      crossAxisAlignment: mine
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      children: [
+        if (!mine)
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Text(name, style: _meta()),
           ),
-          if (_isUploading) const LinearProgressIndicator(),
-          _messageInputField(),
+        _bubble(
+          mine,
+          child: isFile
+              ? _attachment(msg['attachment_url'], msg['content'])
+              : Text(msg['content'] ?? "", style: _text(mine)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(time, style: _meta()),
+        ),
+      ],
+    );
+  }
+
+  Widget _bubble(bool mine, {required Widget child}) => Container(
+    padding: const EdgeInsets.all(10),
+    margin: const EdgeInsets.symmetric(vertical: 6),
+    constraints: const BoxConstraints(maxWidth: 260),
+    decoration: BoxDecoration(
+      color: mine ? Colors.teal : Colors.grey.shade300,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: child,
+  );
+
+  Widget _attachment(String url, String? caption) {
+    final isImage = url.toLowerCase().contains(RegExp(r"(png|jpg|jpeg|gif)$"));
+
+    return GestureDetector(
+      onTap: () =>
+          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          isImage
+              ? ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(url),
+          )
+              : Row(
+            children: [
+              const Icon(Icons.file_present),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  url.split('/').last,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if ((caption ?? "").isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(caption!),
+            ),
         ],
       ),
     );
   }
 
-  Widget _messageInputField() {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.attach_file),
-              onPressed: _isUploading ? null : _showAttachmentOptions,
-            ),
-            Expanded(
-              child: TextField(
-                controller: _messageController,
-                decoration: InputDecoration(
-                  hintText: 'type_message'.tr(),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey[850]
-                      : Colors.grey[200],
-                  hintStyle: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white70
-                        : Colors.black54,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+  Widget _inputField() => SafeArea(
+    child: Padding(
+      padding: const EdgeInsets.all(10),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.attach_file),
+            onPressed: uploading ? null : _pickAttachment,
+          ),
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              decoration: InputDecoration(
+                hintText: "type_message".tr(),
+                filled: true,
+                fillColor: Colors.grey.shade200,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
                 ),
-                style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white
-                      : Colors.black,
-                ),
-                onSubmitted: (_) => _sendMessage(),
               ),
+              onSubmitted: (_) => _send(),
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.send),
-              onPressed: _sendMessage,
-              style: IconButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                padding: const EdgeInsets.all(12),
-              ),
-            ),
-          ],
-        ),
+          ),
+          IconButton(icon: const Icon(Icons.send), onPressed: _send),
+        ],
       ),
-    );
-  }
-} // end of _ChatPageState
+    ),
+  );
 
-// ----------------- helper widgets below (outside of _ChatPageState) -----------------
+  // ---------------- Helpers ----------------
+  String _formatTime(String? t) =>
+      t == null ? "" : DateFormat('h:mm a').format(DateTime.parse(t).toLocal());
 
-class _MessageBubble extends StatelessWidget {
-  final String message;
-  final bool isMine;
-  final String senderName;
-  final String senderRole;
-  final String? timestamp;
+  TextStyle _meta() => TextStyle(fontSize: 10, color: Colors.grey.shade500);
 
-  const _MessageBubble({
-    required this.message,
-    required this.isMine,
-    required this.senderName,
-    required this.senderRole,
-    this.timestamp,
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final displayRole = senderRole.isNotEmpty
-        ? senderRole[0].toUpperCase() + senderRole.substring(1)
-        : '';
-
-    String formattedTime = '';
-    if (timestamp != null) {
-      try {
-        final dateTime = DateTime.parse(timestamp!).toLocal();
-        formattedTime = DateFormat('h:mm a').format(dateTime);
-      } catch (e) {
-        formattedTime = '';
-      }
-    }
-
-    return Column(
-      crossAxisAlignment: isMine
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
-      children: [
-        if (!isMine)
-          Padding(
-            padding: const EdgeInsets.only(left: 12, bottom: 4, top: 8),
-            child: Text(
-              '$senderName (${displayRole})',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        Row(
-          mainAxisAlignment: isMine
-              ? MainAxisAlignment.end
-              : MainAxisAlignment.start,
-          children: [
-            Flexible(
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? (isMine ? Colors.teal[400] : Colors.white)
-                      : (isMine
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.secondary),
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(16),
-                    topRight: const Radius.circular(16),
-                    bottomLeft: isMine
-                        ? const Radius.circular(16)
-                        : Radius.zero,
-                    bottomRight: isMine
-                        ? Radius.zero
-                        : const Radius.circular(16),
-                  ),
-                ),
-                child: Text(
-                  message,
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? (isMine ? Colors.white : Colors.black)
-                        : (isMine
-                        ? Theme.of(context).colorScheme.onPrimary
-                        : Theme.of(context).colorScheme.onSecondary),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          child: Text(
-            formattedTime,
-            style: TextStyle(color: Colors.grey[500], fontSize: 10),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AttachmentBubble extends StatelessWidget {
-  final String url;
-  final String caption;
-  final bool isMine;
-  final String senderName;
-  final String senderRole;
-  final String? timestamp;
-
-  const _AttachmentBubble({
-    required this.url,
-    required this.caption,
-    required this.isMine,
-    required this.senderName,
-    required this.senderRole,
-    this.timestamp,
-    Key? key,
-  }) : super(key: key);
-
-  bool get _isImage {
-    final lowerUrl = url.toLowerCase();
-    return lowerUrl.endsWith('.png') ||
-        lowerUrl.endsWith('.jpg') ||
-        lowerUrl.endsWith('.jpeg') ||
-        lowerUrl.endsWith('.gif');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final displayRole = senderRole.isNotEmpty
-        ? senderRole[0].toUpperCase() + senderRole.substring(1)
-        : '';
-
-    String formattedTime = '';
-    if (timestamp != null) {
-      try {
-        final dateTime = DateTime.parse(timestamp!).toLocal();
-        formattedTime = DateFormat('h:mm a').format(dateTime);
-      } catch (e) {
-        formattedTime = '';
-      }
-    }
-
-    return Column(
-      crossAxisAlignment: isMine
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
-      children: [
-        if (!isMine)
-          Padding(
-            padding: const EdgeInsets.only(left: 12, bottom: 4, top: 8),
-            child: Text('$senderName ($displayRole)'),
-          ),
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          padding: const EdgeInsets.all(4),
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.7,
-          ),
-          decoration: BoxDecoration(
-            color: isMine
-                ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              GestureDetector(
-                onTap: () async {
-                  final uri = Uri.parse(url);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
-                child: _isImage
-                    ? ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(url, fit: BoxFit.cover),
-                )
-                    : Container(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.insert_drive_file, size: 32),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          Uri.decodeComponent(url.split('/').last),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (caption.isNotEmpty && !caption.startsWith('Attachment:'))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                  child: Text(caption),
-                ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          child: Text(
-            formattedTime,
-            style: TextStyle(color: Colors.grey[500], fontSize: 10),
-          ),
-        ),
-      ],
-    );
-  }
+  TextStyle _text(bool mine) =>
+      TextStyle(color: mine ? Colors.white : Colors.black);
 }

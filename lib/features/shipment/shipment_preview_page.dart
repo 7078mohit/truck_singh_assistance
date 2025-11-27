@@ -1,8 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:slide_to_act/slide_to_act.dart';
 
 class ShipmentPreviewPage extends StatefulWidget {
   final String shipmentId;
@@ -45,49 +43,12 @@ class _ShipmentPreviewPageState extends State<ShipmentPreviewPage> with TickerPr
     try {
       final res = await Supabase.instance.client.from('shipment').select().eq('shipment_id', widget.shipmentId).maybeSingle();
       setState(() {
-        shipmentData = res as Map<String, dynamic>?;
+        shipmentData = res;
         _loading = false;
       });
     } catch (e) {
       setState(() => _loading = false);
       debugPrint('Error fetching shipment: $e');
-    }
-  }
-
-  Future<void> _updateShipmentStatus() async {
-    try {
-      await Supabase.instance.client.from('shipment').update({'booking_status': 'Confirmed'}).eq('shipment_id', widget.shipmentId);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar( SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle),
-              SizedBox(width: 8),
-              Text("shipmentConfirmedSuccess".tr()),
-            ],
-          ),
-          backgroundColor: Colors.green,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-          behavior: SnackBarBehavior.floating,
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar( SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.error),
-              SizedBox(width: 8),
-              Text("shipmentUpdateFailed".tr()),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-          behavior: SnackBarBehavior.floating,
-        ));
-      }
-      debugPrint('Error updating status: $e');
     }
   }
 
@@ -148,7 +109,7 @@ class _ShipmentPreviewPageState extends State<ShipmentPreviewPage> with TickerPr
             color: Theme.of(context).cardColor,
             //color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 2, blurRadius: 10, offset: const Offset(0, 3))],
+            boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), spreadRadius: 2, blurRadius: 10, offset: const Offset(0, 3))],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,9 +245,9 @@ class _ShipmentPreviewPageState extends State<ShipmentPreviewPage> with TickerPr
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: statusColor.withOpacity(0.3)),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

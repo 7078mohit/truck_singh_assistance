@@ -1,7 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class EnhancedSupportTicketDetailPage extends StatefulWidget {
@@ -331,8 +330,8 @@ class _EnhancedSupportTicketDetailPageState
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: bg.withOpacity(0.1),
-                  border: Border.all(color: bg.withOpacity(0.3)),
+                  color: bg.withValues(alpha: 0.1),
+                  border: Border.all(color: bg.withValues(alpha: 0.3)),
                   borderRadius: BorderRadius.circular(12)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

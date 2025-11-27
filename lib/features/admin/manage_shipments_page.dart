@@ -49,10 +49,10 @@ class _ManageShipmentsPageState extends State<ManageShipmentsPage>
     }
   }
   @override
-void didChangeDependencies() {
-  super.didChangeDependencies();
-  setState(() {}); // rebuild to update all .tr() translations when locale changes
-}
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    setState(() {}); // rebuild to update all .tr() translations when locale changes
+  }
 
   // ---------------- Dialog box to edit the shipment pickup and drop location and delivery date.--------------------
   // ----------------- only works if the shipment status is---------------------------
@@ -92,12 +92,12 @@ void didChangeDependencies() {
                   onTap: () async {
                     DateTime pickupDate =
                         DateTime.tryParse(shipment['pickup_date'] ?? '') ??
-                        DateTime.now();
+                            DateTime.now();
 
                     DateTime? pickedDate = await showDatePicker(
                       context: context,
                       initialDate:
-                          DateTime.tryParse(dropdateController.text) ??
+                      DateTime.tryParse(dropdateController.text) ??
                           pickupDate,
                       firstDate: pickupDate,
                       lastDate: DateTime(2100),
@@ -161,24 +161,24 @@ void didChangeDependencies() {
 
   //-------------- to update the shipment details entered in the dialog box-----------------------------
   Future<void> _updateShipment(
-    String shipmentId,
-    String pickup,
-    String drop,
-    String deliveryDate,
-  ) async {
+      String shipmentId,
+      String pickup,
+      String drop,
+      String deliveryDate,
+      ) async {
     try {
       // Perform the update
       final updatedRows = await Supabase.instance.client
           .from('shipment')
           .update({
-            'pickup': pickup,
-            'drop': drop,
-            'delivery_date': deliveryDate,
-          })
+        'pickup': pickup,
+        'drop': drop,
+        'delivery_date': deliveryDate,
+      })
           .eq('shipment_id', shipmentId)
           .select(); // optional, to get updated rows
 
-      if (updatedRows == null || updatedRows.isEmpty) {
+      if (updatedRows.isEmpty) {
         throw "Shipment not found or no changes applied";
       }
 
@@ -192,14 +192,14 @@ void didChangeDependencies() {
     }
   }
 
-Future<List<Map<String, dynamic>>> _fetchShipments() async {
-  final statusKey = _statusFilters[_tabController.index];
-  final response = await Supabase.instance.client.rpc(
-    'get_all_shipments_for_admin',
-    params: {'search_query': _searchQuery, 'status_filter': statusKey},
-  );
-  return response == null ? [] : List<Map<String, dynamic>>.from(response);
-}
+  Future<List<Map<String, dynamic>>> _fetchShipments() async {
+    final statusKey = _statusFilters[_tabController.index];
+    final response = await Supabase.instance.client.rpc(
+      'get_all_shipments_for_admin',
+      params: {'search_query': _searchQuery, 'status_filter': statusKey},
+    );
+    return response == null ? [] : List<Map<String, dynamic>>.from(response);
+  }
 
 
   Future<void> _refresh() async {
@@ -212,12 +212,12 @@ Future<List<Map<String, dynamic>>> _fetchShipments() async {
     // Remove common redundant words
     String cleaned = address
         .replaceAll(
-          RegExp(
-            r'\b(At Post|Post|Tal|Taluka|Dist|District|Po)\b',
-            caseSensitive: false,
-          ),
-          '',
-        )
+      RegExp(
+        r'\b(At Post|Post|Tal|Taluka|Dist|District|Po)\b',
+        caseSensitive: false,
+      ),
+      '',
+    )
         .replaceAll(RegExp(r'\s+'), ' ') // normalize spaces
         .trim();
 
@@ -247,31 +247,31 @@ Future<List<Map<String, dynamic>>> _fetchShipments() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-          title: Text(
-            "manage_shipments".tr(),
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(color: Colors.white),
-          ),
-          bottom: TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            indicatorColor: AppColors.orange,
-            labelColor: AppColors.orange,
-            unselectedLabelColor: Colors.white70,
-            tabs: _statusFilters.map((key) => Tab(text: key.tr())).toList(),
-          ),
+      appBar: AppBar(
+        title: Text(
+          "manage_shipments".tr(),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineMedium?.copyWith(color: Colors.white),
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          indicatorColor: AppColors.orange,
+          labelColor: AppColors.orange,
+          unselectedLabelColor: Colors.white70,
+          tabs: _statusFilters.map((key) => Tab(text: key.tr())).toList(),
+        ),
 
-          //backgroundColor: AppColors.teal,
-        ),
-        body: Column(
-          children: [
-            _buildSearchBar(),
-            Expanded(child: _buildShipmentList()),
-          ],
-        ),
-      );
+        //backgroundColor: AppColors.teal,
+      ),
+      body: Column(
+        children: [
+          _buildSearchBar(),
+          Expanded(child: _buildShipmentList()),
+        ],
+      ),
+    );
   }
 
   Widget _buildSearchBar() {
@@ -285,13 +285,13 @@ Future<List<Map<String, dynamic>>> _fetchShipments() async {
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                    _refresh();
-                  },
-                )
+            icon: const Icon(Icons.clear),
+            onPressed: () {
+              _searchController.clear();
+              setState(() => _searchQuery = '');
+              _refresh();
+            },
+          )
               : null,
         ),
         onChanged: (value) => setState(() => _searchQuery = value),

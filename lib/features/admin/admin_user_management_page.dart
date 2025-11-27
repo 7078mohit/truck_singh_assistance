@@ -321,7 +321,7 @@ class _AdminUserManagementPageState extends State<AdminUserManagementPage>
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.teal.withOpacity(0.3)),
+                border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [

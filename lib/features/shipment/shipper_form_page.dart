@@ -1,19 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
-
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase/supabase.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
-import 'package:slide_to_act/slide_to_act.dart';
-
-import '../../config/config.dart';
-import '../shipment/shipment_preview_page.dart';
-
-//import '../shipment_creator/presentation/screen/new_load.dart';
+import 'package:logistics_toolkit/config/config.dart';
+import 'package:logistics_toolkit/features/shipment/shipment_preview_page.dart';
 import 'address_search_page.dart';
 import 'form_step/address_step.dart';
 import 'form_step/schedule_step.dart';
@@ -497,7 +488,7 @@ class _ShipperFormPageState extends State<ShipperFormPage>
             boxShadow: [
               BoxShadow(
                 //color: Colors.grey.withOpacity(0.1),
-                color: Theme.of(context).shadowColor.withOpacity(0.1),
+                color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
                 spreadRadius: 2,
                 blurRadius: 10,
                 offset: const Offset(0, 3),

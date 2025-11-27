@@ -145,7 +145,6 @@ class _allLoadsPageState extends State<allLoadsPage>
     final selectedTruck = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
-        // Open Mytrucks page in selection mode
         builder: (context) => const Mytrucks(selectable: true),
       ),
     );
@@ -164,11 +163,8 @@ class _allLoadsPageState extends State<allLoadsPage>
       appBar: AppBar(
         title: Text(
           'my_shipments'.tr(),
-          //style: TextStyle(color: Colors.black),
         ),
-        //backgroundColor: Colors.white,
         elevation: 0,
-        //iconTheme: const IconThemeData(color: Colors.black),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(120),
           child: Column(
@@ -181,7 +177,6 @@ class _allLoadsPageState extends State<allLoadsPage>
                     hintText: 'search_hint'.tr(),
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
-                    //fillColor: Colors.grey.shade100,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -291,12 +286,10 @@ class _allLoadsPageState extends State<allLoadsPage>
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        //color: Colors.white,
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            //color: Colors.grey.withOpacity(0.1),
             color: Theme.of(context).shadowColor.withOpacity(0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
@@ -393,12 +386,6 @@ class _allLoadsPageState extends State<allLoadsPage>
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    /*Expanded(
-                      child: _buildInfoChip(
-                        Icons.inventory_2_outlined,
-                        '${trip['shipping_item']} • ${trip['weight']} kg',
-                      ),
-                    ),*/
                     Expanded(
                       child: _buildInfoChip(
                         Icons.inventory_2_outlined,
@@ -443,7 +430,6 @@ class _allLoadsPageState extends State<allLoadsPage>
     );
   }
 
-  // Updated: _buildActionButtons to include "Assign Truck"
   Widget _buildActionButtons(Map<String, dynamic> trip, String status) {
     final shipmentId = trip['shipment_id'];
     final bool isTruckAssigned = trip['assigned_truck'] != null;
@@ -452,7 +438,6 @@ class _allLoadsPageState extends State<allLoadsPage>
       return const SizedBox.shrink();
     }
 
-    // If no truck is assigned, show the "Assign Truck" button
     if (!isTruckAssigned) {
       return SizedBox(
         width: double.infinity,
@@ -472,7 +457,6 @@ class _allLoadsPageState extends State<allLoadsPage>
       );
     }
 
-    // If truck is assigned, show the driver and completion buttons
     return Row(
       children: [
         Expanded(
@@ -492,7 +476,6 @@ class _allLoadsPageState extends State<allLoadsPage>
               backgroundColor: trip['assigned_driver'] == null
                   ? Colors.orange
                   : Colors.grey,
-              //foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -508,7 +491,6 @@ class _allLoadsPageState extends State<allLoadsPage>
             label: Text('complete'.tr()),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
-              //foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -560,7 +542,6 @@ class _allLoadsPageState extends State<allLoadsPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        //color: Colors.grey.shade100,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

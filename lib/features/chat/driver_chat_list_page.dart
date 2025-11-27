@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
+import 'package:easy_localization/easy_localization.dart';
 import '../../services/chat_service.dart';
 import '../../services/driver/driver_chat_service.dart';
 import 'chat_page.dart';
-import 'package:easy_localization/easy_localization.dart';
 
 class DriverChatListPage extends StatefulWidget {
   const DriverChatListPage({super.key});
@@ -13,66 +12,49 @@ class DriverChatListPage extends StatefulWidget {
 }
 
 class _DriverChatListPageState extends State<DriverChatListPage> {
-  final DriverService _driverService = DriverService();
-  final ChatService _chatService = ChatService();
-  late Future<Map<String, dynamic>> _dataFuture;
+  final _driverService = DriverService();
+  final _chat = ChatService();
+  late Future<Map<String, dynamic>> _future;
 
   @override
   void initState() {
     super.initState();
-    _dataFuture = _loadAllData();
+    _future = _loadData();
   }
 
-  Future<Map<String, dynamic>> _loadAllData() async {
-    // 1. Get the driver's ID first (the reliable way)
-    final driverId = await _chatService.getCurrentCustomUserId();
-
-    // 2. Fetch data using that ID
+  Future<Map<String, dynamic>> _loadData() async {
+    final driverId = await _chat.getCurrentCustomUserId();
     final results = await Future.wait([
-      _driverService.getActiveShipmentsForDriver(driverId), // <-- Pass ID here
-      _driverService.getAssociatedOwners(driverId), // <-- Pass ID here
+      _driverService.getActiveShipmentsForDriver(driverId),
+      _driverService.getAssociatedOwners(driverId),
     ]);
-
     return {
-      'shipments': results[0] as List<Map<String, dynamic>>,
-      'owners': results[1] as List<Map<String, dynamic>>,
-      'driverId': driverId, // <-- Pass the ID to the UI
+      "shipments": results[0],
+      "owners": results[1],
+      "driverId": driverId,
     };
   }
 
-  Future<void> _refreshData() async {
-    setState(() {
-      _dataFuture = _loadAllData();
-    });
-  }
+  Future<void> _refresh() async => setState(() => _future = _loadData());
 
-  // Generic navigation logic
-  void _navigateToChat({
-    required String chatTitle,
-    required Future<String> Function() getRoomId,
-  }) async {
+  Future<void> _openChat(String title, Future<String> Function() room) async {
     try {
-      ScaffoldMessenger.of(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("opening_chat".tr())));
+
+      final id = await room();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      Navigator.push(
         context,
-      ).showSnackBar(SnackBar(content: Text('opening_chat'.tr())));
-      final roomId = await getRoomId();
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                ChatPage(roomId: roomId, chatTitle: chatTitle),
-          ),
-        );
-      }
+        MaterialPageRoute(builder: (_) => ChatPage(roomId: id, chatTitle: title)),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('failed_open_chat $e')));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("failed_open_chat $e".tr())));
     }
   }
 
@@ -83,64 +65,36 @@ class _DriverChatListPageState extends State<DriverChatListPage> {
       child: Scaffold(
         appBar: AppBar(
           title: Text('my_chats'.tr()),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Theme.of(context).colorScheme.onPrimary,
           bottom: TabBar(
-            indicatorColor: Theme.of(
-              context,
-            ).colorScheme.secondary, // Indicator color for selected tab
-            labelColor: Theme.of(
-              context,
-            ).colorScheme.onPrimary, // Text color for selected tab
+            indicatorColor: Theme.of(context).colorScheme.secondary,
+            labelColor: Theme.of(context).colorScheme.onPrimary,
             unselectedLabelColor: Colors.white70,
             tabs: [
-              Tab(
-                icon: Icon(Icons.local_shipping),
-                text: 'shipment_chats'.tr(),
-              ),
-              Tab(icon: Icon(Icons.person), text: 'direct_chat'.tr()),
+              Tab(icon: const Icon(Icons.local_shipping), text: "shipment_chats".tr()),
+              Tab(icon: const Icon(Icons.person), text: "direct_chat".tr()),
             ],
           ),
         ),
         body: RefreshIndicator(
-          onRefresh: _refreshData,
+          onRefresh: _refresh,
           child: FutureBuilder<Map<String, dynamic>>(
-            future: _dataFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+            future: _future,
+            builder: (_, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
-              if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
+              if (snap.hasError) {
+                return Center(child: Text("Error: ${snap.error}"));
               }
-              if (!snapshot.hasData) {
-                return RefreshIndicator(
-                  onRefresh: _refreshData,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.6,
-                      child: Center(child: Text('no_messages'.tr())),
-                    ),
-                  ),
-                );
+              if (!snap.hasData) {
+                return Center(child: Text("no_messages".tr()));
               }
 
-              final shipments =
-              snapshot.data!['shipments'] as List<Map<String, dynamic>>;
-              // final owner = snapshot.data!['owner'] as Map<String, dynamic>?;
-              final owners =
-              snapshot.data!['owners']
-              as List<Map<String, dynamic>>; // <-- CHANGED
-              final driverId =
-              snapshot.data!['driverId'] as String?; // <-- Get the driverId
+              final data = snap.data!;
               return TabBarView(
                 children: [
-                  _buildShipmentList(shipments),
-                  _buildDirectChatView(
-                    owners,
-                    driverId,
-                  ), // <-- Call the function directly
+                  _shipmentList(data["shipments"]),
+                  _ownerList(data["owners"], data["driverId"]),
                 ],
               );
             },
@@ -150,72 +104,69 @@ class _DriverChatListPageState extends State<DriverChatListPage> {
     );
   }
 
-  Widget _buildShipmentList(List<Map<String, dynamic>> shipments) {
-    if (shipments.isEmpty) {
-      return Center(child: Text('no_active_shipments'.tr()));
-    }
-    return RefreshIndicator(
-      onRefresh: _refreshData,
-      child: ListView.builder(
-        itemCount: shipments.length,
-        itemBuilder: (context, index) {
-          final shipment = shipments[index];
-          final shipmentId = shipment['shipment_id'] ?? 'N/A';
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.group)),
-              title: Text(
-                shipmentId,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Text('group_chat_shipment'.tr()),
-              onTap: () => _navigateToChat(
-                chatTitle: '#$shipmentId',
-                getRoomId: () => _chatService.getShipmentChatRoom(shipmentId),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+  // ---------------- UI Builders ----------------
 
-  Widget _buildDirectChatView(
-      List<Map<String, dynamic>> owners,
-      String? driverId,
-      ) {
-    if (owners.isEmpty) {
-      return Center(child: Text('not_assigned_owner'.tr()));
-    }
+  Widget _shipmentList(List<Map<String, dynamic>> shipments) {
+    if (shipments.isEmpty) return Center(child: Text("no_active_shipments".tr()));
 
-    if (driverId == null) {
-      return Center(child: Text('could_not_identify_user'.tr()));
-    }
     return ListView.builder(
-      itemCount: owners.length,
-      itemBuilder: (context, index) {
-        final owner = owners[index];
-        final ownerName = owner['name'] ?? 'Unknown';
-        final ownerId = owner['custom_user_id'];
-
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person)),
-            title: Text(
-              ownerName,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text('Direct chat with $ownerName'),
-            onTap: () => _navigateToChat(
-              chatTitle: 'Chat with $ownerName',
-              getRoomId: () =>
-                  _chatService.getDriverOwnerChatRoom(driverId, ownerId),
-            ),
+      itemCount: shipments.length,
+      itemBuilder: (_, i) {
+        final id = shipments[i]["shipment_id"] ?? "N/A";
+        return _card(
+          title: id,
+          subtitle: "group_chat_shipment".tr(),
+          icon: Icons.group,
+          action: () => _openChat(
+            "#$id",
+                () => _chat.getShipmentChatRoom(id),
           ),
         );
       },
     );
   }
+
+  Widget _ownerList(List<Map<String, dynamic>> owners, String? driverId) {
+    if (ownerisempty(owners, driverId)) {
+      return Center(child: Text("not_assigned_owner".tr()));
+    }
+
+    return ListView.builder(
+      itemCount: owners.length,
+      itemBuilder: (_, i) {
+        final owner = owners[i];
+        final name = owner["name"] ?? "Unknown";
+        final id = owner["custom_user_id"];
+
+        return _card(
+          title: name,
+          subtitle: "Direct chat with $name",
+          icon: Icons.person,
+          action: () => _openChat(
+            "Chat with $name",
+                () => _chat.getDriverOwnerChatRoom(driverId!, id),
+          ),
+        );
+      },
+    );
+  }
+
+  bool ownerisempty(List owners, driverId) =>
+      owners.isEmpty || driverId == null;
+
+  Widget _card({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback action,
+  }) =>
+      Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: ListTile(
+          leading: CircleAvatar(child: Icon(icon)),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text(subtitle),
+          onTap: action,
+        ),
+      );
 }

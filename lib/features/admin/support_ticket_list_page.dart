@@ -1,7 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
 import 'support_ticket_detail_page.dart';
 
 class SupportTicketListPage extends StatefulWidget {

@@ -211,7 +211,7 @@ class _CompanyDriverEmergencyScreenState
           boxShadow: [
             if (isSelected)
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
+                color: Colors.black.withValues(alpha: 0.15),
                 offset: const Offset(0, 4),
                 blurRadius: 6,
               )
@@ -258,7 +258,7 @@ class _CompanyDriverEmergencyScreenState
           color: _isSending ? Colors.grey : Colors.teal,
           boxShadow: [
             BoxShadow(
-              color: Colors.teal.withOpacity(0.3),
+              color: Colors.teal.withValues(alpha: 0.3),
               offset: const Offset(0, 3),
               blurRadius: 6,
             )
