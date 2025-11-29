@@ -4,7 +4,6 @@ import '../features/auth/utils/user_role.dart';
 class SupabaseService2 {
   static final SupabaseClient _client = Supabase.instance.client;
   static SupabaseClient get client => _client;
-
   static Future<bool> saveUserProfile({
     required String customUserId,
     required String userId,
@@ -47,7 +46,7 @@ class SupabaseService2 {
       if (roleString == null) return null;
 
       return UserRole.values.firstWhere(
-        (role) => role.dbValue == roleString,
+            (role) => role.dbValue == roleString,
         orElse: () => UserRole.driver,
       );
     } catch (e) {
@@ -148,10 +147,11 @@ class SupabaseService2 {
       }
       final isSameUser =
           performerResponse['user_id'] == targetResponse['user_id'];
-      final isAuthorizedOwner = (performerResponse['role'] == 'truckowner' ||
+      final isAuthorizedOwner =
+          (performerResponse['role'] == 'truckowner' ||
               performerResponse['role'] == 'agent') &&
-          targetResponse['truck_owner_id'] ==
-              performerResponse['custom_user_id'];
+              targetResponse['truck_owner_id'] ==
+                  performerResponse['custom_user_id'];
 
       if (!isSameUser && !isAuthorizedOwner) {
         return {'ok': false, 'error': 'not_authorized'};
@@ -181,11 +181,14 @@ class SupabaseService2 {
       };
 
       // Update account status
-      await _client.from('user_profiles').update({
+      await _client
+          .from('user_profiles')
+          .update({
         'account_disable': disable,
         'account_status_logs': [...currentLogs, logEntry],
         'updated_at': DateTime.now().toIso8601String(),
-      }).eq('custom_user_id', targetCustomId);
+      })
+          .eq('custom_user_id', targetCustomId);
 
       return {
         'ok': true,
@@ -217,10 +220,10 @@ class SupabaseService2 {
             .eq('custom_user_id', requesterCustomId)
             .maybeSingle()
             .timeout(
-              const Duration(seconds: 10),
-              onTimeout: () =>
-                  throw Exception('Timeout: Failed to get requester profile'),
-            );
+          const Duration(seconds: 10),
+          onTimeout: () =>
+          throw Exception('Timeout: Failed to get requester profile'),
+        );
 
         if (requesterResponse == null) {
           return {'ok': false, 'error': 'requester_not_found'};
@@ -238,10 +241,10 @@ class SupabaseService2 {
             .eq('custom_user_id', ownerCustomId)
             .maybeSingle()
             .timeout(
-              const Duration(seconds: 10),
-              onTimeout: () =>
-                  throw Exception('Timeout: Failed to get owner profile'),
-            );
+          const Duration(seconds: 10),
+          onTimeout: () =>
+          throw Exception('Timeout: Failed to get owner profile'),
+        );
 
         if (ownerResponse == null) {
           return {'ok': false, 'error': 'owner_not_found'};
@@ -249,28 +252,28 @@ class SupabaseService2 {
         final notificationResponse = await _client
             .from('notifications')
             .insert({
-              'user_id': ownerResponse['user_id'],
-              'title': 'Account Activation Request',
-              'message':
-                  '${requesterResponse['name']} (${requesterResponse['custom_user_id']}) is requesting to activate their account',
-              'type': 'account_activation_request',
-              'related_id': requesterResponse['custom_user_id'],
-              'data': {
-                'requester_custom_id': requesterResponse['custom_user_id'],
-                'requester_name': requesterResponse['name'],
-                'requester_role': requesterResponse['role'],
-                'request_timestamp': DateTime.now().toIso8601String(),
-              },
-              'created_at': DateTime.now().toIso8601String(),
-              'is_read': false,
-            })
+          'user_id': ownerResponse['user_id'],
+          'title': 'Account Activation Request',
+          'message':
+          '${requesterResponse['name']} (${requesterResponse['custom_user_id']}) is requesting to activate their account',
+          'type': 'account_activation_request',
+          'related_id': requesterResponse['custom_user_id'],
+          'data': {
+            'requester_custom_id': requesterResponse['custom_user_id'],
+            'requester_name': requesterResponse['name'],
+            'requester_role': requesterResponse['role'],
+            'request_timestamp': DateTime.now().toIso8601String(),
+          },
+          'created_at': DateTime.now().toIso8601String(),
+          'is_read': false,
+        })
             .select('id')
             .single()
             .timeout(
-              const Duration(seconds: 15),
-              onTimeout: () =>
-                  throw Exception('Timeout: Failed to create notification'),
-            );
+          const Duration(seconds: 15),
+          onTimeout: () =>
+          throw Exception('Timeout: Failed to create notification'),
+        );
 
         print('Account activation request sent successfully');
         return {
@@ -325,7 +328,7 @@ class SupabaseService2 {
       return {'ok': false, 'error': 'network_error', 'details': e.toString()};
     }
   }
-    static Future<String?> getCustomUserId(String userId) async {
+  static Future<String?> getCustomUserId(String userId) async {
     try {
       final response = await _client
           .from('user_profiles')
@@ -347,8 +350,8 @@ class SupabaseService2 {
       final response = await _client
           .from('user_profiles')
           .select(
-            'custom_user_id, name, role, account_disable, mobile_number, email, profile_picture, created_at',
-          )
+        'custom_user_id, name, role, account_disable, mobile_number, email, profile_picture, created_at',
+      )
           .eq('truck_owner_id', ownerCustomId)
           .ilike('role', 'driver_%');
 

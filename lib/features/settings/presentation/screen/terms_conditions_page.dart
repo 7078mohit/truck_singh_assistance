@@ -14,7 +14,6 @@ class TermsConditionsPage extends StatelessWidget {
         backgroundColor: theme.primaryColor,
         elevation: 1,
       ),
-
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
@@ -28,6 +27,7 @@ class TermsConditionsPage extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 const SizedBox(height: 24),
 
                 _sectionTitle(theme, 'section11Title'.tr()),
@@ -114,13 +114,21 @@ class TermsConditionsPage extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Text(
         text,
-        style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          height: 1.45,
+        ),
       ),
     );
   }
 
-  Widget _divider() => Padding(
-    padding: const EdgeInsets.only(bottom: 16.0),
-    child: Divider(thickness: 0.7, height: 24, color: Colors.black12),
-  );
+  Widget _divider() {
+    return const Padding(
+      padding: EdgeInsets.only(bottom: 16.0),
+      child: Divider(
+        thickness: 0.7,
+        height: 24,
+        color: Colors.black12,
+      ),
+    );
+  }
 }

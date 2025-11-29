@@ -2,10 +2,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 
 class NotificationManager {
-  static final NotificationManager _instance = NotificationManager._internal();
+  static final NotificationManager _instance = NotificationManager._();
   factory NotificationManager() => _instance;
-  NotificationManager._internal();
-  final SupabaseClient _supabase = Supabase.instance.client;
+  NotificationManager._();
+  final SupabaseClient _db = Supabase.instance.client;
 
   Future<String?> createNotification({
     required String userId,
@@ -16,7 +16,7 @@ class NotificationManager {
     String? sourceId,
   }) async {
     try {
-      final result = await _supabase.rpc(
+      final result = await _db.rpc(
         'create_smart_notification',
         params: {
           'p_user_id': userId,
@@ -29,12 +29,12 @@ class NotificationManager {
       );
 
       if (kDebugMode) {
-        debugPrint('✅ Notification created for user $userId: "$title"');
+        debugPrint('🟢 Notification sent: $title --> $userId');
       }
       return result as String?;
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('❌ Error creating notification via RPC: $e');
+        debugPrint('🔴 Notification Error: $e');
       }
       return null;
     }
@@ -47,36 +47,24 @@ class NotificationManager {
     String? pickup,
     String? drop,
   }) async {
-    String message;
-    switch (status.toLowerCase()) {
-      case 'accepted':
-        message = 'Shipment $shipmentId is now accepted and ready for pickup.';
-        break;
-      case 'in transit':
-        message =
-            'Shipment $shipmentId is now in transit from ${pickup ?? 'origin'} to ${drop ?? 'destination'}.';
-        break;
-      case 'delivered':
-        message =
-            'Shipment $shipmentId has been successfully delivered to ${drop ?? 'destination'}.';
-        break;
-      case 'cancelled':
-        message = 'Shipment $shipmentId has been cancelled.';
-        break;
-      default:
-        message = 'Shipment $shipmentId status has been updated to: $status.';
-    }
+    final message = switch (status.toLowerCase()) {
+      'accepted' => 'Shipment $shipmentId is accepted and ready for pickup.',
+      'in transit' =>
+      'Shipment $shipmentId is in transit from ${pickup ?? 'origin'} to ${drop ?? 'destination'}.',
+      'delivered' =>
+      'Shipment $shipmentId has been delivered to ${drop ?? 'destination'}.',
+      'cancelled' => 'Shipment $shipmentId has been cancelled.',
+      _ => 'Shipment $shipmentId status updated: $status.',
+    };
 
     await createNotification(
       userId: userId,
-      title: 'Shipment Status Updated',
+      title: 'Shipment Updated',
       message: message,
       type: 'shipment',
-      sourceType: 'app',
       sourceId: shipmentId,
     );
   }
-
 
   Future<void> createComplaintFiledNotification({
     required String complainerId,
@@ -86,47 +74,38 @@ class NotificationManager {
   }) async {
     await createNotification(
       userId: complainerId,
-      title: 'Complaint Filed Successfully',
-      message:
-          'Your complaint regarding "$complaintSubject" has been submitted.',
+      title: 'Complaint Submitted',
+      message: 'Your complaint "$complaintSubject" has been submitted.',
       type: 'complaint',
       sourceId: complaintId,
     );
-    if (targetUserId != null) {
+
+    if (targetUserId case final id?) {
       await createNotification(
-        userId: targetUserId,
-        title: 'A Complaint Has Been Filed',
-        message:
-            'A complaint regarding "$complaintSubject" has been filed against you.',
+        userId: id,
+        title: 'Complaint Filed',
+        message: 'A complaint about "$complaintSubject" was filed against you.',
         type: 'complaint',
         sourceId: complaintId,
       );
     }
   }
+
   Future<void> createComplaintStatusNotification({
     required String userId,
     required String complaintSubject,
     required String status,
     String? complaintId,
   }) async {
-    String message;
-    switch (status.toLowerCase()) {
-      case 'resolved':
-        message =
-            'Your complaint regarding "$complaintSubject" has been marked as resolved.';
-        break;
-      case 'rejected':
-        message =
-            'Your complaint regarding "$complaintSubject" has been rejected.';
-        break;
-      default:
-        message =
-            'The status of your complaint "$complaintSubject" has been updated to $status.';
-    }
+    final message = switch (status.toLowerCase()) {
+      'resolved' => 'Your complaint "$complaintSubject" is resolved.',
+      'rejected' => 'Your complaint "$complaintSubject" was rejected.',
+      _ => 'Complaint "$complaintSubject" updated to: $status.',
+    };
 
     await createNotification(
       userId: userId,
-      title: 'Complaint Status Updated',
+      title: 'Complaint Updated',
       message: message,
       type: 'complaint',
       sourceId: complaintId,

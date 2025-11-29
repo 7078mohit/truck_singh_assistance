@@ -73,192 +73,290 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get languagePreferences => 'Language Preferences';
+
+  @override
   String get requestSupport => "Request Technical Support";
-  String get verify_otp=>"Verify OTP";
 
-  String get edit_mobile=> "Edit Mobile Number";
+  @override
+  String get verify_otp => "Verify OTP";
 
-  String get reportBug=>"Report a Bug";
+  @override
+  String get edit_mobile => "Edit Mobile Number";
 
-  String get changepassword=>"Change Password";
+  @override
+  String get reportBug => "Report a Bug";
 
-  String get delete=>"Delete";
+  @override
+  String get changepassword => "Change Password";
 
-  String get blockAccount=>"Block Account";
+  @override
+  String get delete => "Delete";
 
-  String get update=>"Update";
-  String get save=>"Save";
+  @override
+  String get blockAccount => "Block Account";
 
-  String get no=>"No";
-  String get yes=>"Yes";
+  @override
+  String get update => "Update";
 
-  String get apply=>"Apply";
+  @override
+  String get save => "Save";
 
-  String get verify=>"Verify";
+  @override
+  String get no => "No";
 
-  String? get mobile_number =>"Mobile Number";
+  @override
+  String get yes => "Yes";
 
-  String get account_disabled=> "Your account is disabled.";
+  @override
+  String get apply => "Apply";
 
-  String get error_sending_otp=> "Error sending OTP: {error}";
+  @override
+  String get verify => "Verify";
 
-  String? get enter_otp=> "Enter OTP";
+  @override
+  String? get mobile_number => "Mobile Number";
 
-  String get mobile_verified=>"Mobile number verified ✅";
+  @override
+  String get account_disabled => "Your account is disabled.";
 
-  String get otp_failed=>"OTP verification failed ❌";
+  @override
+  String get error_sending_otp => "Error sending OTP: {error}";
 
-  String get error_verifying_otp=>"Error verifying OTP: {error}";
+  @override
+  String? get enter_otp => "Enter OTP";
 
-  String get logout_message=>"Are you sure you want to log out?";
+  @override
+  String get mobile_verified => "Mobile number verified ✅";
 
-  String get profilePictureUpdated=> "Profile picture updated.";
+  @override
+  String get otp_failed => "OTP verification failed ❌";
 
-  String? get uploadError=>"Upload error: {error}";
+  @override
+  String get error_verifying_otp => "Error verifying OTP: {error}";
 
-  String get failedToUpload=> "Failed to upload: {error}";
+  @override
+  String get logout_message => "Are you sure you want to log out?";
 
-  String? get bugHint=>"Describe the issue you're facing...";
+  @override
+  String get profilePictureUpdated => "Profile picture updated.";
 
-  String get bugEmpty=> "Please describe the bug before sending.";
+  @override
+  String? get uploadError => "Upload error: {error}";
 
-  String? get oldPassword=> "Old Password";
+  @override
+  String get failedToUpload => "Failed to upload: {error}";
 
-  String? get newPassword=>"New Password";
+  @override
+  String? get bugHint => "Describe the issue you're facing...";
 
-  String get passwordHint=>"Hint: Use at least 8 characters with uppercase, lowercase, number, and special character.";
+  @override
+  String get bugEmpty => "Please describe the bug before sending.";
 
-  String get atLeast8Chars=> "at least 8 characters";
+  @override
+  String? get oldPassword => "Old Password";
 
-  String get uppercaseLetter=>"an uppercase letter";
+  @override
+  String? get newPassword => "New Password";
 
-  String get lowercaseLetter=> "a lowercase letter";
+  @override
+  String get passwordHint =>
+      "Hint: Use at least 8 characters with uppercase, lowercase, number, and special character.";
 
-  String get aNumber=> "a number";
+  @override
+  String get atLeast8Chars => "at least 8 characters";
 
-  String get specialCharacter=> "a special character";
+  @override
+  String get uppercaseLetter => "an uppercase letter";
 
+  @override
+  String get lowercaseLetter => "a lowercase letter";
+
+  @override
+  String get aNumber => "a number";
+
+  @override
+  String get specialCharacter => "a special character";
+
+  @override
   String get passwordStrong => "Great! Your password is strong.";
 
-  Object get weak=>"Weak";
+  @override
+  Object get weak => "Weak";
 
-  Object get medium=>"Medium";
+  @override
+  Object get medium => "Medium";
 
-  String? get confirmNewPassword=> "Confirm New Password";
+  @override
+  String? get confirmNewPassword => "Confirm New Password";
 
-  String get allFieldsRequired=> "All fields are required.";
+  @override
+  String get allFieldsRequired => "All fields are required.";
 
-  String get passwordMismatch=>"New password and confirmation do not match.";
+  @override
+  String get passwordMismatch => "New password and confirmation do not match.";
 
-  String get noUser=>"No user logged in.";
+  @override
+  String get noUser => "No user logged in.";
 
-  String get wrongOldPassword=>"Old password is incorrect.";
+  @override
+  String get wrongOldPassword => "Old password is incorrect.";
 
-  String get passwordUpdated=>"Password updated successfully.";
+  @override
+  String get passwordUpdated => "Password updated successfully.";
 
-  String get passwordUpdateFailed=>"Password update failed. Try again.";
+  @override
+  String get passwordUpdateFailed => "Password update failed. Try again.";
 
-  String get editName=>"Edit Name";
+  @override
+  String get editName => "Edit Name";
 
-  String? get fullName=>"Full Name";
+  @override
+  String? get fullName => "Full Name";
 
-  String get confirmNameChange=>"Confirm Name Change";
+  @override
+  String get confirmNameChange => "Confirm Name Change";
 
-  String get nameChangeMessage=>"Are you sure you want to change your name from \"{oldName}\" to \"{newName}\"?";
+  @override
+  String get nameChangeMessage =>
+      "Are you sure you want to change your name from \"{oldName}\" to \"{newName}\"?";
 
-  String get nameUpdated=>"Name updated successfully";
+  @override
+  String get nameUpdated => "Name updated successfully";
 
+  @override
+  String get nameUpdateError => "Error updating name: {error}";
 
+  @override
+  String get accountDisabledLogout =>
+      "Your account has been disabled. You cannot log in again.";
 
-  String get nameUpdateError=>"Error updating name: {error}";
+  @override
+  String get accountDisabledSupport =>
+      "Your account is disabled. Contact support.";
 
-  String get accountDisabledLogout=> "Your account has been disabled. You cannot log in again.";
+  @override
+  String get chooseFile => "Choose File";
 
-  String get accountDisabledSupport=> "Your account is disabled. Contact support.";
+  @override
+  String get nameEmptyError => "Name cannot be empty";
 
-  String get chooseFile=> "Choose File";
+  @override
+  String get mobileInvalidError => "Enter a valid 10-digit number";
 
-  get nameEmptyError=> "Name cannot be empty";
+  @override
+  String get close => "Close";
 
-  get mobileInvalidError=>"Enter a valid 10-digit number";
+  @override
+  String get imageUploadFailed => "Image upload failed: {error}";
 
-  String get close=>"Close";
+  @override
+  String get accountManagement => "Account Management";
 
-  String get imageUploadFailed=>"Image upload failed: {error}";
+  @override
+  String get deleteAccount => "Delete Account";
 
-  String get accountManagement=> "Account Management";
+  @override
+  String get address => "Address";
 
-  String get deleteAccount=>"Delete Account";
+  @override
+  String get addressBook => "Address book";
 
-  String get address=>"Address";
+  @override
+  String get notificationSettings => "Notification Settings";
 
-  String get addressBook=>"Address book";
+  @override
+  String get supportFeedback => "Support & Feedback";
 
-  String get notificationSettings=> "Notification Settings";
+  @override
+  String get legalInfo => "Legal & Info";
 
-  String get supportFeedback=>"Support & Feedback";
+  @override
+  String get privacyPolicy => "Privacy Policy";
 
-  String get legalInfo=>"Legal & Info";
+  @override
+  String get performanceOverview => "Performance Overview";
 
-  String get privacyPolicy=> "Privacy Policy";
+  @override
+  String get activeLoads => "Active Loads";
 
-  // #agentdb
-  String get performanceOverview=> "Performance Overview";
+  @override
+  String get completed => "Completed";
 
-  String get activeLoads=> "Active Loads";
+  @override
+  String get findShipments => "Find Shipments";
 
-  String get completed=>  "Completed";
+  @override
+  String get availableLoads => "Available loads";
 
-  String get findShipments=> "Find Shipments";
+  @override
+  String get createShipment => "Create Shipment";
 
-  String get availableLoads=> "Available loads" ;
+  @override
+  String get postNewLoad => "Post a new load";
 
-  String get createShipment=> "Create Shipment";
+  @override
+  String get myChats => "My Chats";
 
-  String get postNewLoad=> "Post a new load";
+  @override
+  String get viewConversations => "View conversations";
 
-  String get myChats=>"My Chats" ;
+  @override
+  String get loadBoard => "Load Board";
 
-  String get viewConversations=>"View conversations" ;
+  @override
+  String get browsePostLoads => "Browse & post loads";
 
-  String get loadBoard=>  "Load Board";
+  @override
+  String get activeTrips => "Active Trips";
 
-  String get browsePostLoads=> "Browse & post loads";
+  @override
+  String get monitorLiveLocations => "Monitor live locations";
 
-  String get activeTrips=> "Active Trips" ;
+  @override
+  String get myTrucks => "My Trucks";
 
-  String get monitorLiveLocations=>  "Monitor live locations";
+  @override
+  String get addTrackVehicles => "Add & track vehicles";
 
-  String get myTrucks=> "My Trucks";
+  @override
+  String get myDrivers => "My Drivers";
 
-  String get addTrackVehicles=> "Add & track vehicles" ;
+  @override
+  String get addTrackDrivers => "Add & track drivers";
 
-  String get myDrivers=>  "My Drivers";
+  @override
+  String get ratings => "Ratings";
 
-  String get addTrackDrivers=> "Add & track drivers";
+  @override
+  String get viewRatings => "View your ratings";
 
-  String get ratings=>  "Ratings";
+  @override
+  String get complaints => "Complaints";
 
-  String get viewRatings=> "View your ratings" ;
+  @override
+  String get fileOrView => "File or view";
 
-  String get complaints=> "Complaints";
+  @override
+  String get myTrips => "My Trips";
 
-  String get fileOrView=> "File or view";
+  @override
+  String get historyDetails => "History & Details";
 
-  String get myTrips=>"My Trips" ;
+  @override
+  String get bilty => "Bilty";
 
-  String get historyDetails=>  "History & Details";
+  @override
+  String get createConsignmentNote => "Create Consignment Note";
 
-  String get bilty=> "Bilty";
+  @override
+  String get truckDocuments => "Truck Documents";
 
-  String get createConsignmentNote=>"Create Consignment Note" ;
+  @override
+  String get manageTruckRecords => "Manage Truck Records";
 
-  String get truckDocuments=> "Truck Documents" ;
+  @override
+  String get driverDocuments => "Driver Documents";
 
-  String get manageTruckRecords=>"Manage Truck Records" ;
-
-  String get driverDocuments=>  "Driver Documents";
-
-  String get manageDriverRecords=> "Manage Driver Records";
-
+  @override
+  String get manageDriverRecords => "Manage Driver Records";
 }

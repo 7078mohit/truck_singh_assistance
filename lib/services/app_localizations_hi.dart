@@ -1,6 +1,4 @@
-import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
-
 
 /// The translations for Hindi (`hi`).
 class AppLocalizationsHi extends AppLocalizations {
@@ -72,198 +70,298 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String get languagePreferences => 'भाषा प्राथमिकताएँ';
 
-  String get verify_otp=>"ओटीपी सत्यापित करें";
+  @override
+  String get verify_otp => "ओटीपी सत्यापित करें";
 
-  String get edit_mobile=>"मोबाइल नंबर संपादित करें";
+  @override
+  String get edit_mobile => "मोबाइल नंबर संपादित करें";
 
-  String get reportBug=> "बग की रिपोर्ट करें";
+  @override
+  String get reportBug => "बग की रिपोर्ट करें";
 
-  String get changepassword=> "पासवर्ड बदलें";
+  @override
+  String get changepassword => "पासवर्ड बदलें";
 
-  String get delete=>"हटाएं";
+  @override
+  String get delete => "हटाएं";
 
-  String get blockAccount=>"खाता ब्लॉक करें";
+  @override
+  String get blockAccount => "खाता ब्लॉक करें";
 
-  String get update=>"अपडेट करें";
-  String get save=>"सहेजें";
+  @override
+  String get update => "अपडेट करें";
 
-  String get no=>"नहीं";
-  String get yes=>"हाँ";
+  @override
+  String get save => "सहेजें";
 
-  String get apply=> "लागू करें";
+  @override
+  String get no => "नहीं";
 
-  String get verify=>"सत्यापित करें";
+  @override
+  String get yes => "हाँ";
 
+  @override
+  String get apply => "लागू करें";
+
+  @override
+  String get verify => "सत्यापित करें";
+
+  @override
   String? get mobile_number => "मोबाइल नंबर";
 
-  String get account_disabled=>"आपका खाता निष्क्रिय कर दिया गया है।";
+  @override
+  String get account_disabled => "आपका खाता निष्क्रिय कर दिया गया है।";
 
-  String get error_sending_otp=> "ओटीपी भेजने में त्रुटि: {error}";
+  @override
+  String get error_sending_otp => "ओटीपी भेजने में त्रुटि: {error}";
 
-  String? get enter_otp=>"ओटीपी दर्ज करें";
+  @override
+  String? get enter_otp => "ओटीपी दर्ज करें";
 
-  String get mobile_verified=> "मोबाइल नंबर सत्यापित ✅";
+  @override
+  String get mobile_verified => "मोबाइल नंबर सत्यापित ✅";
 
-  String get otp_failed=>"ओटीपी सत्यापन विफल ❌";
+  @override
+  String get otp_failed => "ओटीपी सत्यापन विफल ❌";
 
-  String get error_verifying_otp=>"ओटीपी सत्यापित करने में त्रुटि: {error}";
+  @override
+  String get error_verifying_otp => "ओटीपी सत्यापित करने में त्रुटि: {error}";
 
-  String get logout_message=>"क्या आप वाकई लॉग आउट करना चाहते हैं?";
+  @override
+  String get logout_message => "क्या आप वाकई लॉग आउट करना चाहते हैं?";
 
-  String get profilePictureUpdated=> "प्रोफ़ाइल तस्वीर अपडेट हो गई।";
+  @override
+  String get profilePictureUpdated => "प्रोफ़ाइल तस्वीर अपडेट हो गई।";
 
-  String? get uploadError=> "अपलोड त्रुटि: {error}";
+  @override
+  String? get uploadError => "अपलोड त्रुटि: {error}";
 
-  String get failedToUpload=> "अपलोड विफल: {error}";
+  @override
+  String get failedToUpload => "अपलोड विफल: {error}";
 
-  String? get bugHint=>"जिस समस्या का आप सामना कर रहे हैं उसका विवरण दें...";
+  @override
+  String? get bugHint => "जिस समस्या का आप सामना कर रहे हैं उसका विवरण दें...";
 
-  String get bugEmpty=>"भेजने से पहले कृपया बग का विवरण दें।";
+  @override
+  String get bugEmpty => "भेजने से पहले कृपया बग का विवरण दें।";
 
-  String? get oldPassword=>"पुराना पासवर्ड";
+  @override
+  String? get oldPassword => "पुराना पासवर्ड";
 
-  String? get newPassword=>"नया पासवर्ड";
+  @override
+  String? get newPassword => "नया पासवर्ड";
 
-  String get passwordHint=> "संकेत: कम से कम 8 अक्षरों का उपयोग करें जिसमें बड़े अक्षर, छोटे अक्षर, संख्या और विशेष अक्षर हों।";
+  @override
+  String get passwordHint =>
+      "संकेत: कम से कम 8 अक्षरों का उपयोग करें जिसमें बड़े अक्षर, छोटे अक्षर, संख्या और विशेष अक्षर हों।";
 
-  String get atLeast8Chars=> "कम से कम 8 अक्षर";
+  @override
+  String get atLeast8Chars => "कम से कम 8 अक्षर";
 
-  String get uppercaseLetter=> "एक बड़ा अक्षर";
+  @override
+  String get uppercaseLetter => "एक बड़ा अक्षर";
 
-  String get lowercaseLetter=>"एक छोटा अक्षर";
+  @override
+  String get lowercaseLetter => "एक छोटा अक्षर";
 
-  String get aNumber=>"एक संख्या";
+  @override
+  String get aNumber => "एक संख्या";
 
-  String get specialCharacter=> "एक विशेष अक्षर";
+  @override
+  String get specialCharacter => "एक विशेष अक्षर";
 
-  String get passwordStrong =>"बहुत अच्छा! आपका पासवर्ड मज़बूत है।";
+  @override
+  String get passwordStrong => "बहुत अच्छा! आपका पासवर्ड मज़बूत है।";
 
-  Object get weak=>"कमज़ोर";
+  @override
+  Object get weak => "कमज़ोर";
 
-  Object get medium=>"मध्यम";
+  @override
+  Object get medium => "मध्यम";
 
-  String? get confirmNewPassword=>"नए पासवर्ड की पुष्टि करें";
+  @override
+  String? get confirmNewPassword => "नए पासवर्ड की पुष्टि करें";
 
-  String get allFieldsRequired=>"सभी फ़ील्ड आवश्यक हैं।";
+  @override
+  String get allFieldsRequired => "सभी फ़ील्ड आवश्यक हैं।";
 
-  String get passwordMismatch=>"नया पासवर्ड और पुष्टि मेल नहीं खाते।";
+  @override
+  String get passwordMismatch => "नया पासवर्ड और पुष्टि मेल नहीं खाते।";
 
-  String get noUser=>"कोई उपयोगकर्ता लॉग इन नहीं है।";
+  @override
+  String get noUser => "कोई उपयोगकर्ता लॉग इन नहीं है।";
 
-  String get wrongOldPassword=> "पुराना पासवर्ड गलत है।";
+  @override
+  String get wrongOldPassword => "पुराना पासवर्ड गलत है।";
 
-  String get passwordUpdated=> "पासवर्ड सफलतापूर्वक अपडेट हो गया।";
+  @override
+  String get passwordUpdated => "पासवर्ड सफलतापूर्वक अपडेट हो गया।";
 
-  String get passwordUpdateFailed=> "पासवर्ड अपडेट असफल रहा। फिर से प्रयास करें।";
+  @override
+  String get passwordUpdateFailed =>
+      "पासवर्ड अपडेट असफल रहा। फिर से प्रयास करें।";
 
-  String get editName=> "नाम संपादित करें";
+  @override
+  String get editName => "नाम संपादित करें";
 
-  String? get fullName=> "पूरा नाम";
+  @override
+  String? get fullName => "पूरा नाम";
 
-  String get confirmNameChange=>"नाम परिवर्तन की पुष्टि करें";
+  @override
+  String get confirmNameChange => "नाम परिवर्तन की पुष्टि करें";
 
-  String get nameChangeMessage=> "क्या आप वाकई अपना नाम \"{oldName}\" से बदलकर \"{newName}\" करना चाहते हैं?";
+  @override
+  String get nameChangeMessage =>
+      "क्या आप वाकई अपना नाम \"{oldName}\" से बदलकर \"{newName}\" करना चाहते हैं?";
 
-  String get nameUpdated=>"नाम सफलतापूर्वक अपडेट हो गया";
+  @override
+  String get nameUpdated => "नाम सफलतापूर्वक अपडेट हो गया";
 
+  @override
+  String get nameUpdateError => "नाम अपडेट करते समय त्रुटि: {error}";
 
+  @override
+  String get accountDisabledLogout =>
+      "आपका खाता अक्षम कर दिया गया है। आप दोबारा लॉगिन नहीं कर सकते।";
 
-  String get nameUpdateError=>"नाम अपडेट करते समय त्रुटि: {error}";
+  @override
+  String get accountDisabledSupport =>
+      "आपका खाता अक्षम है। कृपया सहायता से संपर्क करें।";
 
-  String get accountDisabledLogout=>"आपका खाता अक्षम कर दिया गया है। आप दोबारा लॉगिन नहीं कर सकते।";
+  @override
+  String get chooseFile => "फ़ाइल चुनें";
 
-  String get accountDisabledSupport=> "आपका खाता अक्षम है। कृपया सहायता से संपर्क करें।";
+  @override
+  String get nameEmptyError => "नाम खाली नहीं हो सकता";
 
-  String get chooseFile=>"फ़ाइल चुनें";
+  @override
+  String get mobileInvalidError => "मान्य 10-अंकों का नंबर दर्ज करें";
 
-  get nameEmptyError=>"नाम खाली नहीं हो सकता";
+  @override
+  String get close => "बंद करें";
 
-  get mobileInvalidError=>"मान्य 10-अंकों का नंबर दर्ज करें";
+  @override
+  String get imageUploadFailed => "छवि अपलोड विफल: {error}";
 
-  String get close=>"बंद करें";
+  @override
+  String get accountManagement => "खाता प्रबंधन";
 
-  String get imageUploadFailed=> "छवि अपलोड विफल: {error}";
+  @override
+  String get deleteAccount => "खाता हटाएं";
 
-  String get accountManagement=> "खाता प्रबंधन";
+  @override
+  String get address => "पता";
 
-  String get deleteAccount=> "खाता हटाएं";
+  @override
+  String get addressBook => "पता पुस्तिका";
 
-  String get address=>"पता";
+  @override
+  String get notificationSettings => "सूचना सेटिंग्स";
 
-  String get addressBook=> "पता पुस्तिका";
+  @override
+  String get supportFeedback => "सहायता और प्रतिक्रिया";
 
-  String get notificationSettings=>"सूचना सेटिंग्स";
+  @override
+  String get legalInfo => "कानूनी और जानकारी";
 
-  String get supportFeedback=> "सहायता और प्रतिक्रिया";
+  @override
+  String get privacyPolicy => "गोपनीयता नीति";
 
-  String get legalInfo=>"कानूनी और जानकारी";
+  @override
+  String get requestSupport => "तकनीकी सहायता का अनुरोध करें";
 
-  String get privacyPolicy=>"गोपनीयता नीति";
-  String get requestSupport=>"तकनीकी सहायता का अनुरोध करें";
+  /// Agent Dashboard Strings
 
+  @override
+  String get performanceOverview => "प्रदर्शन अवलोकन";
 
+  @override
+  String get activeLoads => "सक्रिय लोड्स";
 
+  @override
+  String get completed => "पूर्ण";
 
-  String get performanceOverview=> "प्रदर्शन अवलोकन";
+  @override
+  String get findShipments => "शिपमेंट खोजें";
 
-  String get activeLoads=>"सक्रिय लोड्स" ;
+  @override
+  String get availableLoads => "उपलब्ध लोड्स";
 
-  String get completed=>  "पूर्ण";
+  @override
+  String get createShipment => "शिपमेंट बनाएं";
 
-  String get findShipments=>  "शिपमेंट खोजें";
+  @override
+  String get postNewLoad => "नया लोड पोस्ट करें";
 
-  String get availableLoads=> "उपलब्ध लोड्स";
+  @override
+  String get myChats => "मेरे चैट्स";
 
-  String get createShipment=>"शिपमेंट बनाएं" ;
+  @override
+  String get viewConversations => "संवाद देखें";
 
-  String get postNewLoad=>  "नया लोड पोस्ट करें";
+  @override
+  String get loadBoard => "लोड बोर्ड";
 
-  String get myChats=>"मेरे चैट्स" ;
+  @override
+  String get browsePostLoads => "लोड ब्राउज़ और पोस्ट करें";
 
-  String get viewConversations=> "संवाद देखें";
+  @override
+  String get activeTrips => "सक्रिय यात्राएँ";
 
-  String get loadBoard=>  "लोड बोर्ड";
+  @override
+  String get monitorLiveLocations => "लाइव स्थान मॉनिटर करें";
 
-  String get browsePostLoads=>"लोड ब्राउज़ और पोस्ट करें" ;
+  @override
+  String get myTrucks => "मेरे ट्रक";
 
-  String get activeTrips=> "सक्रिय यात्राएँ";
+  @override
+  String get addTrackVehicles => "वाहन जोड़ें और ट्रैक करें";
 
-  String get monitorLiveLocations=> "लाइव स्थान मॉनिटर करें";
+  @override
+  String get myDrivers => "मेरे ड्राइवर";
 
-  String get myTrucks=>"मेरे ट्रक" ;
+  @override
+  String get addTrackDrivers => "ड्राइवर जोड़ें और ट्रैक करें";
 
-  String get addTrackVehicles=> "वाहन जोड़ें और ट्रैक करें";
+  @override
+  String get ratings => "रेटिंग्स";
 
-  String get myDrivers=>  "मेरे ड्राइवर";
+  @override
+  String get viewRatings => "अपनी रेटिंग्स देखें";
 
-  String get addTrackDrivers=>"ड्राइवर जोड़ें और ट्रैक करें" ;
+  @override
+  String get complaints => "शिकायतें";
 
-  String get ratings=>  "रेटिंग्स";
+  @override
+  String get fileOrView => "दर्ज करें या देखें";
 
-  String get viewRatings=> "अपनी रेटिंग्स देखें";
+  @override
+  String get myTrips => "मेरी यात्राएँ";
 
-  String get complaints=> "शिकायतें" ;
+  @override
+  String get historyDetails => "इतिहास और विवरण";
 
-  String get fileOrView=> "दर्ज करें या देखें";
+  @override
+  String get bilty => "बिल्टी";
 
-  String get myTrips=>"मेरी यात्राएँ" ;
+  @override
+  String get createConsignmentNote => "कंसाइनमेंट नोट बनाएं";
 
-  String get historyDetails=>"इतिहास और विवरण" ;
+  @override
+  String get truckDocuments => "ट्रक दस्तावेज़";
 
-  String get bilty=>"बिल्टी" ;
+  @override
+  String get manageTruckRecords => "ट्रक रिकॉर्ड प्रबंधित करें";
 
-  String get createConsignmentNote=> "कंसाइनमेंट नोट बनाएं";
+  @override
+  String get driverDocuments => "ड्राइवर दस्तावेज़";
 
-  String get truckDocuments=> "ट्रक दस्तावेज़" ;
+  @override
+  String get manageDriverRecords => "ड्राइवर रिकॉर्ड प्रबंधित करें";
 
-  String get manageTruckRecords=>  "ट्रक रिकॉर्ड प्रबंधित करें";
+  @override
+  String get selectTruckType => "ट्रक प्रकार चुनें";
 
-  String get driverDocuments=> "ड्राइवर दस्तावेज़" ;
-
-  String get manageDriverRecords=> "ड्राइवर रिकॉर्ड प्रबंधित करें";
-
-  String get selectTruckType=>"ट्रक प्रकार चुनें";
-
-  String get name=>"नाम";
-
+  @override
+  String get name => "नाम";
 }

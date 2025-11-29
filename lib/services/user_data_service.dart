@@ -2,50 +2,51 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserDataService {
-  static String? _cachedCustomUserId;
-  static const _prefsKey = 'custom_user_id';
+  UserDataService._();
 
+  static const _cacheKey = 'custom_user_id';
+  static String? _cachedId;
   static Future<String?> getCustomUserId() async {
-    if (_cachedCustomUserId != null) {
-      return _cachedCustomUserId;
-    }
+    if (_cachedId != null) return _cachedId;
+
     final prefs = await SharedPreferences.getInstance();
-    final storedId = prefs.getString(_prefsKey);
+    final storedId = prefs.getString(_cacheKey);
+
     if (storedId != null) {
-      _cachedCustomUserId = storedId;
+      _cachedId = storedId;
       return storedId;
     }
-    final supabase = Supabase.instance.client;
-    final user = supabase.auth.currentUser;
 
+    final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
-      print('UserDataService: Cannot get custom ID because user is not logged in.');
+      print('⚠ getCustomUserId: No authenticated user.');
       return null;
     }
 
     try {
-      final response = await supabase
+      final result = await Supabase.instance.client
           .from('user_profiles')
           .select('custom_user_id')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle(); // safer than .single()
 
-      final customId = response['custom_user_id'] as String?;
+      final customId = result?['custom_user_id'];
 
       if (customId != null) {
-        _cachedCustomUserId = customId;
-        await prefs.setString(_prefsKey, customId); // save to local storage
+        _cachedId = customId;
+        await prefs.setString(_cacheKey, customId);
       }
 
       return customId;
     } catch (e) {
-      print('UserDataService: Error fetching custom user ID - $e');
+      print('❌ Error retrieving custom_user_id: $e');
       return null;
     }
   }
+  /// Clears both memory + shared storage cache
   static Future<void> clearCache() async {
-    _cachedCustomUserId = null;
+    _cachedId = null;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_prefsKey);
+    await prefs.remove(_cacheKey);
   }
 }

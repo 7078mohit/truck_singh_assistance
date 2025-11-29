@@ -3,54 +3,47 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class LocalDatabaseHelper {
-  static const _databaseName = "LocationCache.db";
-  static const _databaseVersion =
-      1;
-  static const tableLocations = 'locations';
+  static const String _dbName = "LocationCache.db";
+  static const int _dbVersion = 1;
+  static const String tableLocations = 'locations';
+  LocalDatabaseHelper._();
+  static final LocalDatabaseHelper instance = LocalDatabaseHelper._();
+  static Database? _db;
 
-  LocalDatabaseHelper._privateConstructor();
-  static final LocalDatabaseHelper instance =
-      LocalDatabaseHelper._privateConstructor();
-
-  static Database? _database;
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+    return _db ??= await _initDatabase();
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), _databaseName);
-    return await openDatabase(
-      path,
-      version: _databaseVersion,
-      onCreate: _onCreate,
-    );
+    final dbPath = join(await getDatabasesPath(), _dbName);
+    return openDatabase(dbPath, version: _dbVersion, onCreate: _onCreate);
   }
 
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
-          CREATE TABLE $tableLocations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            custom_user_id TEXT NOT NULL,
-            user_id TEXT,
-            location_lat REAL NOT NULL,
-            location_lng REAL NOT NULL,
-            last_updated_at TEXT NOT NULL
-          )
-          ''');
+      CREATE TABLE $tableLocations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        custom_user_id TEXT NOT NULL,
+        user_id TEXT,
+        location_lat REAL NOT NULL,
+        location_lng REAL NOT NULL,
+        last_updated_at TEXT NOT NULL
+      )
+    ''');
   }
 
   Future<int> insertLocation(Map<String, dynamic> row) async {
-    Database db = await instance.database;
-    return await db.insert(tableLocations, row);
+    final db = await database;
+    return db.insert(tableLocations, row);
   }
+
   Future<List<Map<String, dynamic>>> getAllLocations() async {
-    Database db = await instance.database;
-    return await db.query(tableLocations);
+    final db = await database;
+    return db.query(tableLocations);
   }
+
   Future<int> clearAllLocations() async {
-    Database db = await instance.database;
-    return await db.delete(tableLocations);
+    final db = await database;
+    return db.delete(tableLocations);
   }
 }

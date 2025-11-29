@@ -37,7 +37,6 @@ class CustomAppBar extends StatefulWidget implements PreferredSizeWidget {
 }
 
 class _CustomAppBarState extends State<CustomAppBar> {
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -55,14 +54,13 @@ class _CustomAppBarState extends State<CustomAppBar> {
           : null,
       title: widget.showProfile
           ? _buildProfileTitle(context)
-          : _buildPageTitle(context),
+          : _buildPageTitle(),
       actions: _buildActions(context),
     );
   }
-
   Widget _buildProfileTitle(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colors = theme.colorScheme;
 
     if (widget.isLoading) {
       return _buildLoadingTitle();
@@ -72,8 +70,8 @@ class _CustomAppBarState extends State<CustomAppBar> {
       return Row(
         children: [
           CircleAvatar(
-            backgroundColor: colorScheme.errorContainer,
-            child: Icon(Icons.error, color: colorScheme.onErrorContainer),
+            backgroundColor: colors.errorContainer,
+            child: Icon(Icons.error, color: colors.onErrorContainer),
           ),
           const SizedBox(width: 12),
           Text('Error loading profile', style: theme.textTheme.titleMedium),
@@ -83,29 +81,12 @@ class _CustomAppBarState extends State<CustomAppBar> {
 
     final profile = widget.userProfile!;
     return GestureDetector(
-      onTap:
-      widget.onProfileTap ??
+      onTap: widget.onProfileTap ??
               () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SettingsPage()),
-          ),
+              context, MaterialPageRoute(builder: (_) => const SettingsPage())),
       child: Row(
         children: [
-          profile['profile_picture'] != null &&
-              profile['profile_picture'].isNotEmpty
-              ? CircleAvatar(
-            radius: 20,
-            backgroundColor: colorScheme.primaryContainer,
-            backgroundImage: NetworkImage(profile['profile_picture']),
-          )
-              : CircleAvatar(
-            radius: 20,
-            backgroundColor: colorScheme.primaryContainer,
-            child: Icon(
-              Icons.person,
-              color: colorScheme.onPrimaryContainer,
-            ),
-          ),
+          _buildProfilePicture(profile, colors),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -120,35 +101,46 @@ class _CustomAppBarState extends State<CustomAppBar> {
                 Text(
                   'ID: ${profile['custom_user_id'] ?? 'N/A'}',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
-
               ],
             ),
-          ),
+          )
         ],
       ),
     );
   }
 
-  Widget _buildPageTitle(BuildContext context) {
+  Widget _buildProfilePicture(Map<String, dynamic> profile, ColorScheme colors) {
+    final imageUrl = profile['profile_picture'];
+    final hasImage = imageUrl != null && imageUrl.toString().isNotEmpty;
+
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: colors.primaryContainer,
+      backgroundImage: hasImage ? NetworkImage(imageUrl) : null,
+      child: !hasImage
+          ? Icon(Icons.person, color: colors.onPrimaryContainer)
+          : null,
+    );
+  }
+  Widget _buildPageTitle() {
     return Text(
       widget.pageTitle ?? '',
       style: Theme.of(context).textTheme.titleLarge,
     );
   }
-
   Widget _buildLoadingTitle() {
     return Row(
       children: [
         const CircleAvatar(backgroundColor: Colors.black12),
         const SizedBox(width: 12),
         Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               width: 120,
@@ -168,13 +160,12 @@ class _CustomAppBarState extends State<CustomAppBar> {
               ),
             ),
           ],
-        ),
+        )
       ],
     );
   }
-
   List<Widget> _buildActions(BuildContext context) {
-    List<Widget> actions = [];
+    final List<Widget> actions = [];
 
     if (widget.customActions != null) {
       actions.addAll(widget.customActions!);
@@ -189,10 +180,7 @@ class _CustomAppBarState extends State<CustomAppBar> {
     return StreamBuilder<int>(
       stream: NotificationService.getUnreadCountStream(),
       builder: (context, snapshot) {
-        int unreadCount = 0;
-        if (snapshot.hasData) {
-          unreadCount = snapshot.data!;
-        }
+        final unreadCount = snapshot.data ?? 0;
 
         return Stack(
           alignment: Alignment.center,
@@ -202,10 +190,13 @@ class _CustomAppBarState extends State<CustomAppBar> {
               onPressed: () async {
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const NotificationCenterPage()),
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationCenterPage(),
+                  ),
                 );
               },
             ),
+            // Badge
             if (unreadCount > 0)
               Positioned(
                 top: 8,
@@ -216,10 +207,17 @@ class _CustomAppBarState extends State<CustomAppBar> {
                     color: Colors.red,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
                   child: Text(
                     unreadCount > 99 ? '99+' : '$unreadCount',
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),

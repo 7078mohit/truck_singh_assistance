@@ -49,7 +49,6 @@ class AdminService {
       final role = profile?['role']?.toString().toLowerCase();
       final customId = profile?['custom_user_id']?.toString();
 
-      // Check if user is admin or agent with admin permissions
       final isAdmin = role == 'admin';
       final isAgentWithAdminPerms =
           role == 'agent' && customId?.startsWith('AGNT') == true;
@@ -65,55 +64,42 @@ class AdminService {
     }
   }
 
-  /// Create admin user - CONSOLIDATED VERSION
-  /// Attempts to keep the creator logged in using multiple strategies
-  /// Compatible with both String and int parameter types
+  /// Create admin user - consolidated version with session preservation
   static Future<Map<String, dynamic>> createAdminUser({
     required String email,
     required String password,
     String? name,
-    required dynamic dateOfBirth, // Can be String or int
-    required dynamic mobileNumber, // Can be String or int
+    required dynamic dateOfBirth,
+    required dynamic mobileNumber,
   }) async {
     try {
-      // Handle type conversions for compatibility
       final String dateOfBirthStr = dateOfBirth is String
           ? dateOfBirth
           : (dateOfBirth is int
-          ? DateTime.fromMillisecondsSinceEpoch(
-        dateOfBirth,
-      ).toIso8601String()
+          ? DateTime.fromMillisecondsSinceEpoch(dateOfBirth).toIso8601String()
           : DateTime(1990, 1, 1).toIso8601String());
 
-      final String mobileNumberStr = mobileNumber is String
-          ? mobileNumber
-          : mobileNumber.toString();
+      final String mobileNumberStr =
+      mobileNumber is String ? mobileNumber : mobileNumber.toString();
 
-      // Verify current user is admin FIRST
       final currentUser = _supabase.auth.currentUser;
       if (currentUser == null) {
         throw Exception(
-          'No user is currently logged in. Please log in as an admin first.',
-        );
+            'No user is currently logged in. Please log in as an admin first.');
       }
 
       final currentUserId = currentUser.id;
       final currentUserEmail = currentUser.email;
-      print('🔍 CREATOR: $currentUserEmail (ID: $currentUserId)');
 
-      // Get creator's admin profile and verify permissions
       final creatorProfile = await _supabase
           .from('user_profiles')
           .select('custom_user_id, role')
           .eq('user_id', currentUserId)
           .maybeSingle();
 
-      print('🔍 CREATOR PROFILE: $creatorProfile');
-
       String? creatorAdminId = creatorProfile?['custom_user_id'];
       final creatorRole = creatorProfile?['role']?.toString();
 
-      // Verify admin status
       final isAdmin = creatorRole?.toLowerCase() == 'admin';
       final isAgentWithAdminPerms =
           creatorRole?.toLowerCase() == 'agent' &&
@@ -121,24 +107,18 @@ class AdminService {
 
       if (!isAdmin && !isAgentWithAdminPerms) {
         throw Exception(
-          'Access denied: Only admins can create admin users. Your role: $creatorRole',
-        );
+            'Access denied: Only admins can create admin users. Your role: $creatorRole');
       }
 
-      // Fallback for main admin
       if (creatorAdminId == null && currentUserEmail == 'admin@gmail.com') {
         creatorAdminId = 'ADM5478';
       }
 
       if (creatorAdminId == null) {
         throw Exception(
-          'Creator admin profile not found. Please ensure you are logged in as a valid admin.',
-        );
+            'Creator admin profile not found. Please ensure you are logged in as an admin.');
       }
 
-      print('✅ CREATOR ADMIN ID: $creatorAdminId');
-
-      // Check for duplicate email
       final existingUser = await _supabase
           .from('user_profiles')
           .select('email, custom_user_id')
@@ -147,28 +127,26 @@ class AdminService {
 
       if (existingUser != null) {
         throw Exception(
-          'User with email $email already exists (ID: ${existingUser['custom_user_id']})',
-        );
+            'User with email $email already exists (ID: ${existingUser['custom_user_id']})');
       }
 
-      // Generate unique admin ID
       String customUserId;
       int attempts = 0;
       do {
-        final random =
-            DateTime.now().millisecond +
-                DateTime.now().second * 1000 +
-                attempts;
+        final random = DateTime.now().millisecond +
+            DateTime.now().second * 1000 +
+            attempts;
         final shortId = (random % 10000).toString().padLeft(4, '0');
+
         customUserId = 'ADM$shortId';
 
-        final existingId = await _supabase
+        final exists = await _supabase
             .from('user_profiles')
             .select('custom_user_id')
             .eq('custom_user_id', customUserId)
             .maybeSingle();
 
-        if (existingId == null) break;
+        if (exists == null) break;
         attempts++;
       } while (attempts < 10);
 
@@ -176,12 +154,7 @@ class AdminService {
         throw Exception('Failed to generate unique admin ID after 10 attempts');
       }
 
-      print('🆔 NEW ADMIN ID: $customUserId');
-
-      // STRATEGY 1: Try Admin API first (keeps session intact)
       try {
-        print('🔄 Attempting Admin API method...');
-
         final adminResponse = await _supabase.auth.admin.createUser(
           AdminUserAttributes(
             email: email,
@@ -197,9 +170,7 @@ class AdminService {
 
         if (adminResponse.user != null) {
           final newUserId = adminResponse.user!.id;
-          print('✅ USER CREATED VIA ADMIN API: $newUserId');
 
-          // Create profile
           await _createUserProfile(
             userId: newUserId,
             customUserId: customUserId,
@@ -209,12 +180,6 @@ class AdminService {
             dateOfBirth: dateOfBirthStr,
             mobileNumber: mobileNumberStr,
           );
-
-          // Verify admin is still logged in
-          final stillLoggedIn =
-              _supabase.auth.currentUser?.email?.toLowerCase() ==
-                  currentUserEmail?.toLowerCase();
-          print('✅ ADMIN STILL LOGGED IN: $stillLoggedIn');
 
           return {
             'success': true,
@@ -226,12 +191,8 @@ class AdminService {
             'method': 'admin_api',
           };
         }
-      } catch (adminApiError) {
-        print('⚠️ Admin API failed: $adminApiError');
-      }
+      } catch (_) {}
 
-      // STRATEGY 2: Session preservation method
-      print('🔄 Using session preservation method...');
       return await _createWithSessionPreservation(
         email: email,
         password: password,
@@ -243,7 +204,6 @@ class AdminService {
         mobileNumber: mobileNumberStr,
       );
     } catch (e) {
-      print('🚨 ERROR in createAdminUser: $e');
       return {
         'success': false,
         'error': e.toString(),
@@ -252,7 +212,7 @@ class AdminService {
     }
   }
 
-  /// Helper method to create user profile
+  /// Create profile helper
   static Future<void> _createUserProfile({
     required String userId,
     required String customUserId,
@@ -262,7 +222,7 @@ class AdminService {
     String? dateOfBirth,
     String? mobileNumber,
   }) async {
-    final profileData = {
+    final data = {
       'user_id': userId,
       'custom_user_id': customUserId,
       'email': email,
@@ -277,11 +237,10 @@ class AdminService {
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    await _supabase.from('user_profiles').insert(profileData);
-    print('✅ PROFILE CREATED WITH CREATOR: $creatorAdminId');
+    await _supabase.from('user_profiles').insert(data);
   }
 
-  /// Session preservation fallback method
+  /// Fallback session-preserving user creation
   static Future<Map<String, dynamic>> _createWithSessionPreservation({
     required String email,
     required String password,
@@ -292,17 +251,14 @@ class AdminService {
     required String dateOfBirth,
     required String mobileNumber,
   }) async {
-    // Store current session
     final currentSession = _supabase.auth.currentSession;
     if (currentSession == null) {
       throw Exception('No active session to preserve');
     }
 
     final refreshToken = currentSession.refreshToken;
-    print('🔍 Storing session for: ${currentSession.user.email}');
 
     try {
-      // Create user with signUp (this will auto-login the new user)
       final authResponse = await _supabase.auth.signUp(
         email: email,
         password: password,
@@ -313,9 +269,7 @@ class AdminService {
       }
 
       final newUserId = authResponse.user!.id;
-      print('✅ AUTH USER CREATED: $newUserId');
 
-      // Create profile while signed in as new user
       await _createUserProfile(
         userId: newUserId,
         customUserId: customUserId,
@@ -326,16 +280,13 @@ class AdminService {
         mobileNumber: mobileNumber,
       );
 
-      // Sign out new user
       await _supabase.auth.signOut();
-      print('🔄 New user signed out, restoring original session...');
 
-      // Restore original session using refresh token
       if (refreshToken != null) {
-        final restoreResponse = await _supabase.auth.setSession(refreshToken);
-        if (restoreResponse.session?.user.email?.toLowerCase() ==
+        final restore = await _supabase.auth.setSession(refreshToken);
+
+        if (restore.session?.user.email?.toLowerCase() ==
             currentUserEmail?.toLowerCase()) {
-          print('✅ ORIGINAL SESSION RESTORED SUCCESSFULLY');
           return {
             'success': true,
             'admin_id': customUserId,
@@ -348,86 +299,57 @@ class AdminService {
         }
       }
 
-      // Session restore failed
-      print('⚠️ Session restore failed, but admin was created');
       return {
         'success': true,
         'admin_id': customUserId,
         'creator_id': creatorAdminId,
         'message':
-        'Admin $customUserId created successfully, but you were logged out. Please log back in.',
+        'Admin $customUserId created successfully, but you were logged out.',
         'requires_reauth': true,
         'method': 'session_restore_failed',
       };
     } catch (e) {
-      print('🚨 Session preservation error: $e');
       throw Exception('Failed to create admin with session preservation: $e');
     }
   }
 
-  /// Get all users that the current admin created
+  /// Get all users created by this admin
   static Future<List<Map<String, dynamic>>> getAllUsers() async {
     try {
       final currentUser = _supabase.auth.currentUser;
-      if (currentUser == null) {
-        throw Exception('User not authenticated');
-      }
+      if (currentUser == null) throw Exception('User not authenticated');
 
-      print('🔍 Fetching users for: ${currentUser.email}');
-
-      // Get current admin's custom_user_id
-      final adminProfile = await _supabase
+      final profile = await _supabase
           .from('user_profiles')
           .select('custom_user_id, role')
           .eq('user_id', currentUser.id)
           .maybeSingle();
 
-      if (adminProfile == null) {
-        throw Exception('Admin profile not found');
-      }
+      if (profile == null) throw Exception('Admin profile not found');
 
-      final adminCustomId = adminProfile['custom_user_id'];
-      print('🔍 Admin Custom ID: $adminCustomId');
+      final adminId = profile['custom_user_id'];
 
-      // Fetch users created by this admin
       final users = await _supabase
           .from('user_profiles')
           .select('*')
-          .eq('created_by_admin_id', adminCustomId)
-          .eq('role', 'Admin') // Only show admin users
+          .eq('created_by_admin_id', adminId)
+          .eq('role', 'Admin')
           .order('created_at', ascending: false);
 
-      print('🔍 Found ${users.length} admin users created by $adminCustomId');
-
-      if (users.isEmpty) {
-        print('⚠️ WARNING: No admin users found! This might indicate:');
-        print('  - No admins have been created yet');
-        print('  - Database issues with created_by_admin_id field');
-        print('  - RLS policy blocking the query');
-      }
-
-      // Deduplicate by email (keep latest)
-      final Map<String, Map<String, dynamic>> uniqueUsers = {};
+      final Map<String, Map<String, dynamic>> unique = {};
       for (final user in users) {
         final email = user['email']?.toString().toLowerCase();
         if (email != null) {
-          if (!uniqueUsers.containsKey(email) ||
-              DateTime.parse(
-                user['created_at'],
-              ).isAfter(DateTime.parse(uniqueUsers[email]!['created_at']))) {
-            uniqueUsers[email] = user;
+          if (!unique.containsKey(email) ||
+              DateTime.parse(user['created_at'])
+                  .isAfter(DateTime.parse(unique[email]!['created_at']))) {
+            unique[email] = user;
           }
         }
       }
 
-      final deduplicatedUsers = uniqueUsers.values.toList();
-      print(
-        '🔍 After deduplication: ${deduplicatedUsers.length} unique admin users',
-      );
-
-      return deduplicatedUsers;
+      return unique.values.toList();
     } catch (e) {
-      print('🚨 ERROR in getAllUsers: $e');
       throw Exception('Failed to fetch users: $e');
     }
   }

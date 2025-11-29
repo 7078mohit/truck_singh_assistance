@@ -2,13 +2,13 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:logistics_toolkit/services/driver/background_task_handler.dart';
 
 class BackgroundLocationService {
+  static final _service = FlutterBackgroundService();
   static Future<void> initializeService() async {
-    final service = FlutterBackgroundService();
-    await service.configure(
+    await _service.configure(
       androidConfiguration: AndroidConfiguration(
         autoStart: false,
-        onStart: onStart,
         isForegroundMode: true,
+        onStart: onStart,
         notificationChannelId: 'location_channel',
         initialNotificationTitle: 'Tracking Service',
         initialNotificationContent: 'Initializing...',
@@ -20,15 +20,14 @@ class BackgroundLocationService {
       ),
     );
   }
-
+  /// Start background service if not already running
   static Future<void> startService() async {
-    final service = FlutterBackgroundService();
-    if (!await service.isRunning()) {
-      service.startService();
+    if (!await _service.isRunning()) {
+      await _service.startService();
     }
   }
-
-  static void stopService() {
-    FlutterBackgroundService().invoke("stopService");
+  /// Stop background service
+  static Future<void> stopService() async {
+    _service.invoke("stopService");
   }
 }

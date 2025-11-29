@@ -33,21 +33,22 @@ class ChatService {
       return null;
     }
   }
+
   Future<Map<String, String?>> _getCurrentUserProfile() async {
-    if (_currentUserProfile != null) {
-      return _currentUserProfile!;
-    }
+    if (_currentUserProfile != null) return _currentUserProfile!;
+
     try {
       final response = await _client
           .from('user_profiles')
           .select('custom_user_id, name')
           .eq('user_id', _client.auth.currentUser!.id)
-          .single();
+          .maybeSingle();
 
       _currentUserProfile = {
-        'custom_user_id': response['custom_user_id'] as String?,
-        'name': response['name'] as String?,
+        'custom_user_id': response?['custom_user_id'] as String?,
+        'name': response?['name'] as String?,
       };
+
       return _currentUserProfile!;
     } catch (e) {
       print('Error fetching user profile: $e');
@@ -59,7 +60,7 @@ class ChatService {
     try {
       final count = await _client.rpc('get_unread_chat_rooms_count');
       if (!_unreadCountController.isClosed) {
-        _unreadCountController.add(count as int);
+        _unreadCountController.add((count ?? 0) as int);
       }
     } catch (e) {
       if (!_unreadCountController.isClosed) {
@@ -95,10 +96,10 @@ class ChatService {
     final senderId = userProfile['custom_user_id'];
     final senderName = userProfile['name'];
 
-    if (senderId == null) {
-      throw Exception("User is not logged in");
-    }
+    if (senderId == null) throw Exception("User is not logged in");
+
     final encryptedContent = EncryptionService.encryptMessage(content, roomId);
+
     await _client.from('chat_messages').insert({
       'room_id': roomId,
       'sender_id': senderId,
@@ -106,6 +107,7 @@ class ChatService {
       'message_type': 'text',
     });
 
+    // Send notification
     try {
       await _client.functions.invoke('send-chat-notification', body: {
         'room_id': roomId,
@@ -114,9 +116,7 @@ class ChatService {
         'message_content': content,
       });
     } catch (e) {
-      if (kDebugMode) {
-        print('Failed to send chat notification: $e');
-      }
+      if (kDebugMode) print('Failed to send chat notification: $e');
     }
   }
 
@@ -137,18 +137,17 @@ class ChatService {
         'p_room_id': roomId,
       });
 
-      final fileExtension = p.extension(fileName);
-      final uniqueFileName =
-          '${DateTime.now().millisecondsSinceEpoch}$fileExtension';
-      final filePath = '$roomId/$senderId/$uniqueFileName';
+      final extension = p.extension(fileName);
+      final uniqueName = '${DateTime.now().millisecondsSinceEpoch}$extension';
+      final filePath = '$roomId/$senderId/$uniqueName';
+
       final fileBytes = await file.readAsBytes();
 
       await _client.storage.from('chat_attachments').uploadBinary(
         filePath,
         fileBytes,
         fileOptions: FileOptions(
-          contentType:
-          lookupMimeType(fileName) ?? 'application/octet-stream',
+          contentType: lookupMimeType(fileName) ?? 'application/octet-stream',
           upsert: false,
         ),
       );
@@ -156,9 +155,9 @@ class ChatService {
       final publicUrl =
       _client.storage.from('chat_attachments').getPublicUrl(filePath);
 
-      final String messageContent = caption != null && caption.isNotEmpty
-          ? caption
-          : 'Attachment: $fileName';
+      final String messageContent =
+      (caption != null && caption.isNotEmpty) ? caption : 'Attachment: $fileName';
+
       final encryptedContent =
       EncryptionService.encryptMessage(messageContent, roomId);
 
@@ -177,9 +176,7 @@ class ChatService {
           'message_content': messageContent,
         });
       } catch (e) {
-        if (kDebugMode) {
-          print('Failed to send chat notification: $e');
-        }
+        if (kDebugMode) print('Failed to send chat notification: $e');
       }
     } catch (e) {
       print('Error sending attachment: $e');
@@ -208,7 +205,6 @@ class ChatService {
 
   Future<void> markRoomAsRead(String roomId) async {
     final userId = _client.auth.currentUser?.id;
-
     if (userId == null) return;
     try {
       await _client.rpc(
@@ -226,6 +222,7 @@ class ChatService {
 
   Stream<List<Map<String, dynamic>>> getMessagesStream(String roomId) {
     final profileCache = <String, Map<String, dynamic>>{};
+
     Future<Map<String, dynamic>> getProfile(String customUserId) async {
       if (profileCache.containsKey(customUserId)) {
         return profileCache[customUserId]!;
@@ -235,15 +232,15 @@ class ChatService {
             .from('user_profiles')
             .select('name, role, custom_user_id')
             .eq('custom_user_id', customUserId)
-            .limit(1)
             .maybeSingle();
+
         if (response != null) {
           profileCache[customUserId] = response;
           return response;
         } else {
           return {'name': 'Unknown User', 'role': ''};
         }
-      } catch (e) {
+      } catch (_) {
         return {'name': 'Unknown User', 'role': ''};
       }
     }
@@ -254,17 +251,17 @@ class ChatService {
         .eq('room_id', roomId)
         .order('created_at')
         .asyncMap((messages) async {
-      final enrichedMessages = <Map<String, dynamic>>[];
-      for (final message in messages) {
-        final decryptedContent =
-        EncryptionService.decryptMessage(message['content'], roomId);
-        enrichedMessages.add({
-          ...message,
-          'content': decryptedContent,
-          'sender': await getProfile(message['sender_id']),
+      final enriched = <Map<String, dynamic>>[];
+      for (final msg in messages) {
+        final decrypted =
+        EncryptionService.decryptMessage(msg['content'], roomId);
+        enriched.add({
+          ...msg,
+          'content': decrypted,
+          'sender': await getProfile(msg['sender_id']),
         });
       }
-      return enrichedMessages;
+      return enriched;
     });
   }
 }

@@ -2,54 +2,48 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ShipmentMonitor {
-  final SupabaseClient supabaseClient;
-  final String customUserId;
-  final Function(Map<String, dynamic>?) onShipmentUpdate;
+  final SupabaseClient client;
+  final String driverId;
+  final void Function(Map<String, dynamic>?) onShipmentUpdate;
 
-  Timer? _shipmentCheckTimer;
+  Timer? _timer;
 
   ShipmentMonitor({
-    required this.supabaseClient,
-    required this.customUserId,
+    required SupabaseClient supabaseClient,
+    required String customUserId,
     required this.onShipmentUpdate,
-  });
+  }) : client = supabaseClient,
+        driverId = customUserId;
 
   void start() {
-    _checkForShipment();
-    _shipmentCheckTimer = Timer.periodic(
-      const Duration(minutes: 2),
-      (_) => _checkForShipment(),
-    );
+    _check();
+    _timer = Timer.periodic(const Duration(minutes: 2), (_) => _check());
   }
 
-  void stop() {
-    _shipmentCheckTimer?.cancel();
-  }
+  void stop() => _timer?.cancel();
 
-  Future<void> _checkForShipment() async {
+  Future<void> _check() async {
     print('[ShipmentMonitor] Checking for new active shipment...');
     try {
-      final activeStatuses = [
+      const statuses = [
         'Accepted',
         'En Route to Pickup',
         'Arrived at Pickup',
         'In Transit',
       ];
-      final response = await supabaseClient
+
+      final shipment = await client
           .from('shipment')
           .select()
-          .eq('assigned_driver', customUserId)
-          .inFilter(
-            'booking_status',
-            activeStatuses,
-          )
+          .eq('assigned_driver', driverId)
+          .inFilter('booking_status', statuses)
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
 
-      onShipmentUpdate(response);
+      onShipmentUpdate(shipment);
     } catch (e) {
-      print('[ShipmentMonitor] Error fetching active shipment: $e');
+      print('[ShipmentMonitor] ❌ Error fetching shipment: $e');
     }
   }
 }

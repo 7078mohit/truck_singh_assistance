@@ -14,7 +14,7 @@ class LocationTrackingManager {
   final String userId;
   final String customUserId;
 
-  StreamSubscription<Position>? _positionStreamSubscription;
+  StreamSubscription<Position>? _positionStreamSub;
   Timer? _syncTimer;
   Map<String, dynamic>? _activeShipment;
 
@@ -29,115 +29,122 @@ class LocationTrackingManager {
     _activeShipment = shipment;
   }
 
-  void start() {
+  /// Start location tracking + offline sync
+  Future<void> start() async {
+    await _checkPermissions();
+
+    // Auto-sync every 5 minutes
     _syncTimer = Timer.periodic(
       const Duration(minutes: 5),
-      (_) => _syncOfflineLocations(),
+          (_) => _syncOfflineLocations(),
     );
 
-    final locationSettings = AndroidSettings(
+    final settings = LocationSettings(
       accuracy: LocationAccuracy.high,
       distanceFilter: 50,
-      foregroundNotificationConfig: const ForegroundNotificationConfig(
-        notificationTitle: "Tracking Service",
-        notificationText: "Location is being tracked in the background",
-      ),
     );
 
-    _positionStreamSubscription = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen(_onLocationUpdate, onError: _onLocationError);
+    _positionStreamSub = Geolocator.getPositionStream(locationSettings: settings)
+        .listen(_onLocationUpdate, onError: _onLocationError);
   }
 
   void stop() {
-    _positionStreamSubscription?.cancel();
+    _positionStreamSub?.cancel();
     _syncTimer?.cancel();
   }
 
-  Future<void> _onLocationUpdate(Position position) async {
-    final payload = {
+  Future<void> _onLocationUpdate(Position pos) async {
+    final data = {
       'custom_user_id': customUserId,
       'user_id': userId,
-      'location_lat': position.latitude,
-      'location_lng': position.longitude,
+      'location_lat': pos.latitude,
+      'location_lng': pos.longitude,
       'last_updated_at': DateTime.now().toIso8601String(),
     };
 
-    final connectivityResult = await Connectivity().checkConnectivity();
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      await LocalDatabaseHelper.instance.insertLocation(payload);
+    final connectivity = await Connectivity().checkConnectivity();
+
+    // === OFFLINE MODE ===
+    if (connectivity == ConnectivityResult.none) {
+      await LocalDatabaseHelper.instance.insertLocation(data);
       NotificationHelper.updateNotification(
         'Tracking Active (Offline)',
-        'Location saved locally.',
+        'Location stored locally.',
       );
-    } else {
+    }
+
+    else {
       await _syncOfflineLocations();
       try {
-        await supabaseClient.rpc(
-          'update_driver_loc',
-          params: {
-            'user_id_input': userId,
-            'custom_user_id_input': customUserId,
-            'longitude_input': position.longitude,
-            'latitude_input': position.latitude,
-            'heading_input': position.heading,
-            'speed_input': position.speed,
-            'shipment_id_input': _activeShipment?['shipment_id'],
-          },
-        );
-        final currentTime = DateFormat('HH:mm').format(DateTime.now());
+        await supabaseClient.rpc('update_driver_loc', params: {
+          'user_id_input': userId,
+          'custom_user_id_input': customUserId,
+          'longitude_input': pos.longitude,
+          'latitude_input': pos.latitude,
+          'heading_input': pos.heading,
+          'speed_input': pos.speed,
+          'shipment_id_input': _activeShipment?['shipment_id'],
+        });
+
+        final time = DateFormat('HH:mm').format(DateTime.now());
         NotificationHelper.updateNotification(
           'Tracking Active',
-          'Location updated at $currentTime',
+          'Updated at $time',
         );
-
       } catch (e) {
-        print(">>> DATABASE UPDATE FAILED <<< Error calling RPC: $e");
         NotificationHelper.updateNotification(
-          'Upload Failed again',
-          'Error: ${e.toString()}',
+          'Tracking Error',
+          'Upload failed: $e',
         );
       }
     }
 
     if (_activeShipment != null) {
-      final newStatus = await GeofenceService.checkGeofences(
-        position,
-        _activeShipment!,
-      );
+      final newStatus =
+      await GeofenceService.checkGeofences(pos, _activeShipment!);
+
       if (newStatus != null) {
         _activeShipment!['booking_status'] = newStatus;
       }
     }
-
     serviceInstance.invoke('update', {
-      'lat': position.latitude,
-      'lng': position.longitude,
+      'lat': pos.latitude,
+      'lng': pos.longitude,
     });
   }
 
   void _onLocationError(error) {
     NotificationHelper.updateNotification(
       'Tracking Error',
-      'Could not get location.',
+      'Unable to fetch location.',
     );
   }
-
   Future<void> _syncOfflineLocations() async {
-    final connectivityResult = await Connectivity().checkConnectivity();
-    if (connectivityResult.contains(ConnectivityResult.none)) return;
+    final connectivity = await Connectivity().checkConnectivity();
+    if (connectivity == ConnectivityResult.none) return;
 
-    final dbHelper = LocalDatabaseHelper.instance;
-    final offlineLocations = await dbHelper.getAllLocations();
-    if (offlineLocations.isNotEmpty) {
+    final db = LocalDatabaseHelper.instance;
+    final cached = await db.getAllLocations();
+
+    if (cached.isNotEmpty) {
       try {
         await supabaseClient
             .from('driver_locations')
-            .upsert(offlineLocations, onConflict: 'user_id');
-        await dbHelper.clearAllLocations();
+            .upsert(cached, onConflict: 'user_id');
+
+        await db.clearAllLocations();
       } catch (e) {
-        print("Error during offline sync: $e");
+        print("⚠ Error syncing cached locations: $e");
       }
+    }
+  }
+  Future<void> _checkPermissions() async {
+    bool enabled = await Geolocator.isLocationServiceEnabled();
+    if (!enabled) return;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
     }
   }
 }

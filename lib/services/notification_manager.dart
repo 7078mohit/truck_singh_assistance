@@ -30,12 +30,12 @@ class NotificationManager {
       );
 
       if (kDebugMode) {
-        debugPrint('✅ Notification created for user $userId: "$title"');
+        debugPrint('✅ Notification created for $userId: "$title"');
       }
       return result as String?;
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('❌ Error creating notification via RPC: $e');
+        debugPrint('❌ Error creating notification: $e');
       }
       return null;
     }
@@ -55,17 +55,17 @@ class NotificationManager {
         break;
       case 'in transit':
         message =
-            'Shipment $shipmentId is now in transit from ${pickup ?? 'origin'} to ${drop ?? 'destination'}.';
+        'Shipment $shipmentId is in transit from ${pickup ?? 'origin'} to ${drop ?? 'destination'}.';
         break;
       case 'delivered':
         message =
-            'Shipment $shipmentId has been successfully delivered to ${drop ?? 'destination'}.';
+        'Shipment $shipmentId has been delivered to ${drop ?? 'destination'}.';
         break;
       case 'cancelled':
         message = 'Shipment $shipmentId has been cancelled.';
         break;
       default:
-        message = 'Shipment $shipmentId status has been updated to: $status.';
+        message = 'Shipment $shipmentId status updated to $status.';
     }
 
     await createNotification(
@@ -88,7 +88,7 @@ class NotificationManager {
       userId: complainerId,
       title: 'Complaint Filed Successfully',
       message:
-          'Your complaint regarding "$complaintSubject" has been submitted.',
+      'Your complaint regarding "$complaintSubject" has been submitted.',
       type: 'complaint',
       sourceId: complaintId,
     );
@@ -98,7 +98,7 @@ class NotificationManager {
         userId: targetUserId,
         title: 'A Complaint Has Been Filed',
         message:
-            'A complaint regarding "$complaintSubject" has been filed against you.',
+        'A complaint regarding "$complaintSubject" has been filed against you.',
         type: 'complaint',
         sourceId: complaintId,
       );
@@ -115,15 +115,15 @@ class NotificationManager {
     switch (status.toLowerCase()) {
       case 'resolved':
         message =
-            'Your complaint regarding "$complaintSubject" has been marked as resolved.';
+        'Your complaint regarding "$complaintSubject" has been marked resolved.';
         break;
       case 'rejected':
         message =
-            'Your complaint regarding "$complaintSubject" has been rejected.';
+        'Your complaint regarding "$complaintSubject" has been rejected.';
         break;
       default:
         message =
-            'The status of your complaint "$complaintSubject" has been updated to $status.';
+        'Complaint "$complaintSubject" status updated to $status.';
     }
 
     await createNotification(

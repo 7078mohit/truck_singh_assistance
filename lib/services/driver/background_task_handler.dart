@@ -8,24 +8,22 @@ import 'location_tracking_manager.dart';
 import 'shipment_monitor.dart';
 
 @pragma('vm:entry-point')
-void onStart(ServiceInstance service) {
+void onStart(ServiceInstance service) async {
   WidgetsFlutterBinding.ensureInitialized();
   if (service is AndroidServiceInstance) {
     service.setAsForegroundService();
   }
-  service.on('stopService').listen((event) {
-    service.stopSelf();
-  });
-  _runServiceLogic(service);
+  await _runServiceLogic(service);
 }
 
-void _runServiceLogic(ServiceInstance service) async {
+Future<void> _runServiceLogic(ServiceInstance service) async {
   LocationTrackingManager? locationTracker;
   ShipmentMonitor? shipmentMonitor;
   final notificationService = RealTimeNotificationService();
   service.on('stopService').listen((event) {
     locationTracker?.stop();
     shipmentMonitor?.stop();
+    service.stopSelf();
   });
 
   try {
@@ -33,81 +31,75 @@ void _runServiceLogic(ServiceInstance service) async {
     final supabaseUrl = prefs.getString('supabaseUrl');
     final supabaseAnonKey = prefs.getString('supabaseAnonKey');
     if (supabaseUrl == null || supabaseAnonKey == null) {
-      throw Exception("Supabase credentials not found in SharedPreferences.");
+      throw Exception("Supabase credentials missing.");
     }
     await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
-    final supabaseClient = Supabase.instance.client;
+    final client = Supabase.instance.client;
     await notificationService.initialize();
-    Timer.periodic(const Duration(minutes: 15), (timer) async {
-      final userId = prefs.getString('current_user_id');
-      if (userId != null) {
-        await notificationService.checkForNewNotifications(userId: userId);
-      }
+    Future.microtask(() {
+      Timer.periodic(const Duration(minutes: 15), (timer) async {
+        final userId = prefs.getString('current_user_id');
+        if (userId != null) {
+          await notificationService.checkForNewNotifications(userId: userId);
+        }
+      });
     });
+    final user = await _awaitUserSession(client.auth);
+    if (user == null) throw Exception("User not signed in.");
 
-    final user = await _awaitUserSession(supabaseClient.auth);
-    if (user != null) {
-      final driverProfile = await _fetchDriverProfile(supabaseClient, user.id);
-      if (driverProfile != null) {
-        final customUserId = driverProfile['custom_user_id'];
+    final driver = await _fetchDriverProfile(client, user.id);
+    if (driver == null) throw Exception("Driver profile not found.");
 
-        locationTracker = LocationTrackingManager(
-          serviceInstance: service,
-          supabaseClient: supabaseClient,
-          userId: user.id,
-          customUserId: customUserId,
-        );
-        locationTracker.start();
+    final id = driver['custom_user_id'];
 
-        shipmentMonitor = ShipmentMonitor(
-          supabaseClient: supabaseClient,
-          customUserId: customUserId,
-          onShipmentUpdate: (shipment) {
-            locationTracker?.setActiveShipment(shipment);
-          },
-        );
-        shipmentMonitor.start();
-      } else {
-        throw Exception("Driver profile not found.");
-      }
-    } else {
-      throw Exception("User not signed in.");
-    }
+    locationTracker = LocationTrackingManager(
+      serviceInstance: service,
+      supabaseClient: client,
+      userId: user.id,
+      customUserId: id,
+    )..start();
+
+    shipmentMonitor = ShipmentMonitor(
+      supabaseClient: client,
+      customUserId: id,
+      onShipmentUpdate: locationTracker.setActiveShipment,
+    )..start();
   } catch (e) {
-    print("Error during background service startup: $e");
+    print("❌ Background startup error: $e");
     service.stopSelf();
   }
 }
 
 Future<User?> _awaitUserSession(GoTrueClient auth) async {
+  if (auth.currentUser != null) return auth.currentUser;
   final completer = Completer<User?>();
-  if (auth.currentUser != null) {
-    return auth.currentUser;
-  }
-  final subscription = auth.onAuthStateChange.listen((data) {
-    if (data.event == AuthChangeEvent.signedIn && data.session?.user != null) {
-      if (!completer.isCompleted) completer.complete(data.session!.user);
+  final sub = auth.onAuthStateChange.listen((event) {
+    if (event.event == AuthChangeEvent.signedIn &&
+        event.session?.user != null) {
+      if (!completer.isCompleted) completer.complete(event.session!.user);
     }
   });
-  Future.delayed(const Duration(seconds: 15), () {
-    if (!completer.isCompleted) completer.complete(auth.currentUser);
-  });
-  completer.future.whenComplete(() => subscription.cancel());
-  return completer.future;
+
+  await Future.delayed(const Duration(seconds: 15));
+  if (!completer.isCompleted) completer.complete(auth.currentUser);
+
+  final result = await completer.future;
+  await sub.cancel();
+
+  return result;
 }
 
 Future<Map<String, dynamic>?> _fetchDriverProfile(
-  SupabaseClient client,
-  String userId,
-) async {
+    SupabaseClient client,
+    String userId,
+    ) async {
   try {
     return await client
         .from('user_profiles')
         .select('custom_user_id, truck_owner_id')
         .eq('user_id', userId)
         .single();
-  } catch (e) {
-    print('Error fetching driver profile in background: $e');
+  } catch (_) {
     return null;
   }
 }

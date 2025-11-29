@@ -8,7 +8,7 @@ class EncryptionService {
   }
   static String encryptMessage(String plainText, String roomId) {
     final key = _generateKey(roomId);
-    final iv = encrypt.IV.fromSecureRandom(16);
+    final iv = encrypt.IV.fromSecureRandom(16);  // 16-byte IV
     final encrypter = encrypt.Encrypter(encrypt.AES(key));
     final encrypted = encrypter.encrypt(plainText, iv: iv);
     final combined = iv.bytes + encrypted.bytes;
@@ -21,9 +21,9 @@ class EncryptionService {
       final encrypter = encrypt.Encrypter(encrypt.AES(key));
       final combinedBytes = base64.decode(combinedBase64);
       final iv = encrypt.IV(combinedBytes.sublist(0, 16));
-      final encrypted = encrypt.Encrypted(combinedBytes.sublist(16));
-      final decrypted = encrypter.decrypt(encrypted, iv: iv);
-      return decrypted;
+      final encrypted =
+      encrypt.Encrypted(combinedBytes.sublist(16));
+      return encrypter.decrypt(encrypted, iv: iv);
     } catch (e) {
       return 'Decryption Failed';
     }
